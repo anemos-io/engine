@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "io.anemos.grpc.v1alpha1";
+option java_outer_classname = "Anemos";
+
+package grpc_anemos_v1alpha1;
+
+option go_package = "grpc_anemos_v1alpha1";
+
+//import "google/protobuf/timestamp.proto";
+
+
+service Scheduler {
+    rpc Trigger (TriggerRequest) returns (TriggerResponse) {
+    }
+
+}
+
+service Observer {
+    rpc CommandStream (ObserverCommandStreamRequest) returns (stream ObserverCommand) {
+    }
+}
+
+service Executor {
+    rpc CommandStream (ExecutorCommandStreamRequest) returns (stream ExecutorCommand) {
+    }
+}
+
+
+message TaskInstance {
+    string provider = 1;
+    string operation = 2;
+    string name = 3;
+    string id = 4;
+    map<string, string> attributes = 5;
+    map<string, string> metadata = 6;
+}
+
+message Event {
+    string uri = 1;
+    map<string, string> metadata = 4;
+}
+
+message TriggerRequest {
+}
+
+message TriggerResponse {
+}
+
+message ObserverCommandStreamRequest {
+}
+
+message ObserverCommand {
+}
+
+message ExecutorCommandStreamRequest {
+    string uri = 1;
+}
+
+message ExecutorCommand {
+}

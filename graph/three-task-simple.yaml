@@ -1,0 +1,9 @@
+kind: anemos/dag
+version: v1
+metaData:
+  name: three-node-simple
+tasks:
+- name: task-start
+  downstream:
+  - name: task-top
+  - name: task-bottom

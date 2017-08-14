@@ -1,0 +1,346 @@
+package graph
+
+import (
+	//"fmt"
+	//"sync"
+	api "github.com/anemos-io/engine/grpc/anemos/v1alpha1"
+	"log"
+	"github.com/anemos-io/engine"
+	//"fmt"
+	//"reflect"
+	"math/rand"
+	"fmt"
+	"sync"
+)
+
+func logOn(node anemos.Node, function string, name string, event *api.Event) {
+	log.Printf("%s[%s].%s: %s", function, node.ShortName(), name, event.Uri)
+}
+
+type ResourceRouter struct {
+}
+
+type Node struct {
+	Name       string
+	downstream map[string]anemos.Node
+	upstream   map[string]anemos.Node
+	router     anemos.Router
+	status     anemos.NodeInstanceStatus
+	mutex      sync.Mutex
+}
+
+func NewNode() (*Node) {
+	return &Node{
+		downstream: make(map[string]anemos.Node, 0),
+		upstream:   make(map[string]anemos.Node, 0),
+		status:     anemos.Unknown,
+		//nodes: make([]anemos.Node,0),
+	}
+}
+
+func LinkDown(from anemos.Node, to anemos.Node) {
+	name := fmt.Sprint("%s>%s", from.ShortName(), to.ShortName())
+	LinkDownNamed(from,to, name)
+}
+
+func LinkDownNamed(from anemos.Node, to anemos.Node, name string) {
+	from.AddDownstream(name, to)
+	to.AddUpstream(name, from)
+	log.Printf("Link: %s > %s", from.ShortName(), to.ShortName())
+}
+
+func (n *Node) ShortName() (string) {
+	return n.Name
+}
+
+func (n *Node) AddUpstream(name string, node anemos.Node) () {
+	n.upstream[name] = node
+}
+
+func (n *Node) AddDownstream(name string, node anemos.Node) () {
+	n.downstream[name] = node
+}
+
+func (n *Node) Downstream() (map[string]anemos.Node) {
+	return n.downstream
+}
+
+func (n *Node) Upstream() (map[string]anemos.Node) {
+	return n.upstream
+}
+
+func (n *Node) Status() (anemos.NodeInstanceStatus) {
+	return n.status
+}
+
+func (n *Node) SetRouter(router anemos.Router) () {
+	n.router = router
+}
+
+func NewTaskNode() (*TaskNode) {
+	return &TaskNode{
+		Node: NewNode(),
+		//nodes: make([]anemos.Node,0),
+	}
+}
+
+type TaskNode struct {
+	*Node
+	Provider  string
+	Operation string
+}
+
+func (n *TaskNode) OnEvent(event *api.Event) {
+	logOn(n,"TaskNode", "OnEvent", event)
+	if len(n.upstream) > 0 {
+		for _, node := range n.upstream {
+			if node.Status() != anemos.Success {
+				log.Printf("TaskNode.OnEvent: Not all dependencies are saticfied for %s", n.Name)
+				return
+			}
+		}
+	}
+
+	def := api.TaskInstance{
+		Provider:  n.Provider,
+		Operation: n.Operation,
+		Name:      n.Name,
+		Id:        fmt.Sprintf("%x", rand.Int63()),
+	}
+
+	log.Printf("TaskNode.OnEvent: All dependencies are saticfied for %s", n.Name)
+	n.router.Start(n, &def)
+}
+
+func (n *TaskNode) OnStart(event *api.Event) {
+	logOn(n,"TaskNode", "OnStart", event)
+
+}
+
+func (n *TaskNode) OnProgress(event *api.Event) {
+	logOn(n,"TaskNode", "OnProgress", event)
+
+}
+
+func (n *TaskNode) OnFinish(event *api.Event) {
+	logOn(n,"TaskNode", "OnFinish", event)
+	if n.status == anemos.Success {
+		log.Printf("TaskNode.OnFinish: WARNING: Already succeeded")
+		return
+	}
+
+	n.status = anemos.Success
+	if len(n.downstream) > 0 {
+		for _, node := range n.downstream {
+			event := api.Event{
+				Uri: anemos.Uri{
+					Kind:      "anemos/event",
+					Provider:  "anemos",
+					Operation: "parent",
+					Name:      n.Name,
+					Id:        "0000000000000000",
+					Status:    "finished",
+				}.String(),
+			}
+			go node.OnEvent(&event)
+		}
+	}
+}
+
+func (n *TaskNode) OnCancel(event *api.Event) {
+	logOn(n,"TaskNode", "OnCancel", event)
+
+}
+
+func (n *TaskNode) OnSkip(event *api.Event) {
+	logOn(n,"TaskNode", "OnSkip", event)
+
+}
+
+func NewVirtualNode() (*VirtualNode) {
+	return &VirtualNode{
+		Node: NewNode(),
+		//nodes: make([]anemos.Node,0),
+	}
+}
+
+type VirtualNodeType int
+
+const (
+	Solo  VirtualNodeType = iota
+	Begin
+	End
+)
+
+type VirtualNode struct {
+	*Node
+	parent *Group
+	kind   VirtualNodeType
+}
+
+func (n *VirtualNode) OnEvent(event *api.Event) {
+	logOn(n,"VirtualNode", "OnEvent", event)
+	if len(n.upstream) > 0 {
+		for _, node := range n.upstream {
+			if node.Status() != anemos.Success {
+				log.Printf("VirtualNode.OnEvent: Not all dependencies are saticfied for %s", n.Name)
+				return
+			}
+		}
+	}
+
+	if len(n.downstream) > 0 {
+		for _, node := range n.downstream {
+			//event := api.Event{
+			//	Uri: "anemos/event:parent",
+			//}
+			x := node
+			go x.OnEvent(event)
+		}
+	}
+
+	def := api.TaskInstance{
+		Provider:  "anemos",
+		Operation: "virtual",
+		Name:      n.Name,
+		Id:        fmt.Sprintf("%x", rand.Int63()),
+	}
+
+	log.Printf("VirtualNode.OnEvent: All dependencies are saticfied for %s", n.Name)
+	n.router.StartVirtual(n, &def)
+}
+
+func (n *VirtualNode) OnStart(event *api.Event) {
+	logOn(n,"VirtualNode", "OnStart", event)
+
+}
+
+func (n *VirtualNode) OnProgress(event *api.Event) {
+	logOn(n,"VirtualNode", "OnProgress", event)
+
+}
+
+func (n *VirtualNode) OnFinish(event *api.Event) {
+	logOn(n,"VirtualNode", "OnFinish", event)
+	if n.status == anemos.Success {
+		log.Printf("VirtualNode.OnFinish: WARNING Already succeeded")
+		return
+	}
+
+	n.status = anemos.Success
+	if len(n.downstream) > 0 {
+		for _, node := range n.downstream {
+			event := api.Event{
+				Uri: anemos.Uri{
+					Kind:      "anemos/event",
+					Provider:  "anemos",
+					Operation: "parent",
+					Name:      n.Name,
+					Id:        "0000000000000000",
+					Status:    "finshed",
+				}.String(),
+			}
+			x := node
+			go x.OnEvent(&event)
+		}
+	}
+	if n.parent != nil && n.kind == End {
+		log.Printf("VirtualNode[%s].OnFinish: End node reached for group %s", n.ShortName(),
+			n.parent.ShortName())
+		n.parent.channel <- true
+	}
+}
+
+func (n *VirtualNode) OnCancel(event *api.Event) {
+	logOn(n,"VirtualNode", "OnCancel", event)
+
+}
+
+func (n *VirtualNode) OnSkip(event *api.Event) {
+	logOn(n,"VirtualNode", "OnSkip", event)
+
+}
+
+type Group struct {
+	*Node
+	nodes   []anemos.Node
+	begin   *VirtualNode
+	end     *VirtualNode
+	channel chan bool
+}
+
+func NewGroup() (*Group) {
+	return &Group{
+		Node:  &Node{},
+		nodes: make([]anemos.Node, 0),
+		channel: make(chan bool),
+	}
+}
+
+func (g *Group) Resolve() {
+	g.begin = NewVirtualNode()
+	g.begin.parent = g
+	g.begin.kind = Begin
+	g.begin.Name = g.Name + "+begin"
+	g.end = NewVirtualNode()
+	g.end.parent = g
+	g.end.kind = End
+	g.end.Name = g.Name + "+end"
+
+	for _, node := range g.nodes {
+		if len(node.Upstream()) == 0 {
+			name := fmt.Sprint("%s>%s", g.begin.ShortName(), node.ShortName())
+			log.Printf("Group Resolver: Adding link for %s", name)
+			LinkDown(g.begin, node)
+		}
+		if len(node.Downstream()) == 0 {
+			name := fmt.Sprint("%s>%s", node.ShortName(), g.end.ShortName())
+			log.Printf("Group Resolver: Adding link for %s", name)
+			LinkDown(node, g.end)
+		}
+
+	}
+}
+
+func (g *Group) AddNode(node anemos.Node) () {
+	g.nodes = append(g.nodes, node)
+}
+
+func (g *Group) SetRouter(router anemos.Router) () {
+	g.router = router
+	g.begin.router = router
+	g.end.router = router
+	for _, node := range g.nodes {
+		node.SetRouter(router)
+	}
+}
+
+func (g *Group) OnEvent(event *api.Event) {
+	logOn(g,"Group", "OnEvent", event)
+	g.begin.OnEvent(event)
+}
+
+func (g *Group) OnStart(event *api.Event) {
+	logOn(g,"Group", "OnStart", event)
+
+}
+
+func (g *Group) OnProgress(event *api.Event) {
+	logOn(g,"Group", "OnProgress", event)
+
+}
+
+func (g *Group) OnFinish(event *api.Event) {
+	logOn(g,"Group", "OnFinish", event)
+
+}
+
+func (g *Group) OnCancel(event *api.Event) {
+	logOn(g,"Group", "OnCancel", event)
+
+}
+
+func (g *Group) OnSkip(event *api.Event) {
+	logOn(g,"Group", "OnSkip", event)
+
+}

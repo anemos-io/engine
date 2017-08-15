@@ -6,10 +6,10 @@ import (
 	//"fmt"
 	//"sync"
 	//"github.com/stretchr/testify/assert"
-	"time"
 	"github.com/stretchr/testify/assert"
 	"fmt"
 	api "github.com/anemos-io/engine/grpc/anemos/v1alpha1"
+	"github.com/anemos-io/engine"
 )
 
 func Test_time(t *testing.T) {
@@ -29,31 +29,22 @@ func Test_time(t *testing.T) {
 
 	executor.CoupleObserver(&observer)
 
-	instance := api.TaskInstance{
-		Name:"test",
-		Id:"0042",
-		Attributes:make(map[string]string),
-		Metadata:make(map[string]string),
+	instance := &api.TaskInstance{
+		Name:       "test",
+		Id:         "0042",
+		Attributes: make(map[string]string),
+		Metadata:   make(map[string]string),
 	}
 
-	instance.Metadata["anemos/meta:scheduler:retry"] = "0"
+	instance.Metadata[anemos.MetaRetry] = "0"
+	instance.Attributes[AttrSuccessDuration] = "1ms"
+	instance.Attributes[AttrRetries] = "0"
+	executor.Execute(instance)
 
-	definition := NoopTaskDefinition{
-		instance:instance,
-		task: NoopTask{
-			noopTaskType: Success,
-			duration:     time.Duration(100 * time.Millisecond),
-		},
-	}
+	event := <-channel
 
-	executor.ExecuteTMP(definition)
-
-
-	event := <- channel
-
-	assert.Equal(t, "anemos/event:noop:0042:success", event.Uri)
+	assert.Equal(t, "anemos/event:anemos:noop:test:0042:success", event.Uri)
 	fmt.Println(event.Metadata)
-
 
 	//dagConfig := ParseDag("three-task-simple.yaml")
 	//

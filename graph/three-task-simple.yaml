@@ -4,6 +4,9 @@ metaData:
   name: three-node-simple
 tasks:
 - name: task-start
+  task: anemos:noop
   downstream:
-  - name: task-top
-  - name: task-bottom
+  - name: task-left
+    task: anemos:noop
+  - name: task-right
+    task: anemos:noop

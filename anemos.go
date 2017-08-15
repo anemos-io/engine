@@ -78,3 +78,7 @@ func ParseUri(us string) (*Uri, error) {
 		Status:    parts[5],
 	}, nil
 }
+
+const (
+	MetaRetry = "anemos/meta:anemos:engine:retry"
+)

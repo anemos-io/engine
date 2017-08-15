@@ -60,7 +60,12 @@ func (c *NoopObserver) Stop() {
 	c.looping = false
 }
 
-func (c *NoopObserver) Trigger(definition *NoopTaskDefinition) {
+func (c *NoopObserver) trigger(definition *NoopTaskDefinition, success bool) {
+
+	status := "success"
+	if !success {
+		status = "fail"
+	}
 
 	event := api.Event{
 		Uri: anemos.Uri{
@@ -69,11 +74,11 @@ func (c *NoopObserver) Trigger(definition *NoopTaskDefinition) {
 			Operation: "noop",
 			Name:      definition.instance.Name,
 			Id:        definition.instance.Id,
-			Status:    "success",
+			Status:    status,
 		}.String(),
 		Metadata: make(map[string]string),
 	}
-	event.Metadata["anemos/metadata:task:timestamp"] = time.Now().Format(time.RFC3339Nano)
+	event.Metadata[anemos.MetaEventTimestamp] = time.Now().Format(time.RFC3339Nano)
 	c.EventChannel <- &event
 }
 
@@ -82,8 +87,15 @@ func (ne *NoopExecutor) CoupleObserver(observer *NoopObserver) {
 }
 
 func (ne *NoopExecutor) execute(definition NoopTaskDefinition) {
-	time.Sleep(definition.success_duration)
-	ne.observer.Trigger(&definition)
+	if definition.retry < definition.retries {
+		time.Sleep(definition.fail_duration)
+		ne.observer.trigger(&definition, false)
+	} else if definition.retry == definition.retries {
+		time.Sleep(definition.success_duration)
+		ne.observer.trigger(&definition, true)
+	} else {
+		// TODO: ERROR
+	}
 }
 
 func (ne *NoopExecutor) Execute(instance *api.TaskInstance) {
@@ -103,7 +115,7 @@ func (ne *NoopExecutor) Execute(instance *api.TaskInstance) {
 	value, _ = instance.Attributes[AttrFailDuration]
 	definition.fail_duration, _ = time.ParseDuration(value)
 
-	value, _ = instance.Attributes[anemos.MetaRetry]
+	value, _ = instance.Metadata[anemos.MetaTaskRetry]
 	definition.retry, _ = strconv.Atoi(value)
 
 	go ne.execute(definition)

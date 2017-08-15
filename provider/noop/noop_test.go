@@ -2,23 +2,12 @@ package noop
 
 import (
 	"testing"
-	//"time"
-	//"fmt"
-	//"sync"
-	//"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/assert"
-	"fmt"
 	api "github.com/anemos-io/engine/grpc/anemos/v1alpha1"
 	"github.com/anemos-io/engine"
 )
 
-func Test_time(t *testing.T) {
-
-	//val, err := time.Parse(time.RFC3339, "2017-11-28T15:15:30Z")
-	//if err != nil { // Always check errors even if they should not happen.
-	//	panic(err)
-	//}
-	//fmt.Println(val)
+func execute(instance *api.TaskInstance) (*api.Event) {
 
 	channel := make(chan *api.Event)
 
@@ -28,30 +17,63 @@ func Test_time(t *testing.T) {
 	}
 
 	executor.CoupleObserver(&observer)
+	executor.Execute(instance)
 
-	instance := &api.TaskInstance{
+	return <-channel
+}
+
+func newInstance() (*api.TaskInstance) {
+	return &api.TaskInstance{
 		Name:       "test",
 		Id:         "0042",
 		Attributes: make(map[string]string),
 		Metadata:   make(map[string]string),
 	}
 
-	instance.Metadata[anemos.MetaRetry] = "0"
+}
+
+func TestNoop_ExplicitZeroRetry(t *testing.T) {
+
+	instance := newInstance()
+
+	instance.Metadata[anemos.MetaTaskRetry] = "0"
 	instance.Attributes[AttrSuccessDuration] = "1ms"
 	instance.Attributes[AttrRetries] = "0"
-	executor.Execute(instance)
+	event := execute(instance)
 
-	event := <-channel
+	uri, _ := anemos.ParseUri(event.Uri)
+	assert.Equal(t, "success", uri.Status)
+}
 
-	assert.Equal(t, "anemos/event:anemos:noop:test:0042:success", event.Uri)
-	fmt.Println(event.Metadata)
+func TestNoop_AllDefault(t *testing.T) {
 
-	//dagConfig := ParseDag("three-task-simple.yaml")
-	//
-	//assert.Equal(t, "anemos/dag", dagConfig.Kind)
-	//assert.Equal(t, "v1", dagConfig.Version)
-	//assert.Equal(t, "three-node-simple", dagConfig.MetaData.Name)
-	//assert.Equal(t, "task-start", dagConfig.Tasks[0].Name)
-	//assert.Equal(t, "task-top", dagConfig.Tasks[0].Downstream[0].Name)
-	//assert.Equal(t, "task-bottom", dagConfig.Tasks[0].Downstream[1].Name)
+	instance := newInstance()
+	event := execute(instance)
+
+	uri, _ := anemos.ParseUri(event.Uri)
+	assert.Equal(t, "success", uri.Status)
+}
+
+func TestNoop_FailOnRetries1Retry0(t *testing.T) {
+
+	instance := newInstance()
+
+	instance.Metadata[anemos.MetaTaskRetry] = "0"
+	instance.Attributes[AttrRetries] = "1"
+	event := execute(instance)
+
+	uri, _ := anemos.ParseUri(event.Uri)
+	assert.Equal(t, "fail", uri.Status)
+}
+
+func TestNoop_SucceedOnRetries1Retry1(t *testing.T) {
+
+	instance := newInstance()
+
+	instance.Metadata[anemos.MetaTaskRetry] = "1"
+	instance.Attributes[AttrRetries] = "1"
+	event := execute(instance)
+
+	uri, _ := anemos.ParseUri(event.Uri)
+	assert.Equal(t, "success", uri.Status)
 }

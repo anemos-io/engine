@@ -41,7 +41,7 @@ type Node interface {
 type Group interface {
 	Node
 	AddNode(node Node) ()
-    Resolve()
+	Resolve()
 }
 
 type ResourceRouter interface {
@@ -80,5 +80,6 @@ func ParseUri(us string) (*Uri, error) {
 }
 
 const (
-	MetaRetry = "anemos/meta:anemos:engine:retry"
+	MetaTaskRetry      = "anemos/meta:anemos:task:retry"
+	MetaEventTimestamp = "anemos/meta:anemos:event:timestamp"
 )

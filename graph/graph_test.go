@@ -13,6 +13,7 @@ import (
 	//"fmt"
 	"github.com/anemos-io/engine"
 
+	"github.com/anemos-io/engine/provider/noop"
 )
 
 func NewSuccessTask(name string) (*TaskNode) {
@@ -20,6 +21,7 @@ func NewSuccessTask(name string) (*TaskNode) {
 	node.Provider = "anemos"
 	node.Operation = "noop"
 	node.Name = name
+
 	return node
 }
 
@@ -140,6 +142,26 @@ func TestSimpleSplitAndJoin(t *testing.T) {
 	assert.Equal(t, anemos.Success, task2.Status())
 	assert.Equal(t, anemos.Success, task3.Status())
 	assert.Equal(t, anemos.Success, task4.Status())
+}
+
+func TestSingleFail(t *testing.T) {
+
+	r := router.NewInternalRouter()
+
+	task1 := NewSuccessTask("task1")
+	task1.Attributes[noop.AttrNameRetries] = "1"
+
+	g := NewGroup()
+	g.Name = "group"
+
+	g.AddNode(task1)
+	g.Resolve()
+
+	r.RegisterGroup(g)
+
+	StartGroupForSuccess(g, t)
+
+	assert.Equal(t, anemos.Fail, task1.Status())
 }
 
 //func TestStress(t *testing.T) {

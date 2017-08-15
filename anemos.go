@@ -28,6 +28,7 @@ type Node interface {
 	Upstream() (map[string]Node)
 	Downstream() (map[string]Node)
 	Status() (NodeInstanceStatus)
+	EndStateReached() (bool)
 	SetRouter(router Router) ()
 
 	OnEvent(event *api.Event)

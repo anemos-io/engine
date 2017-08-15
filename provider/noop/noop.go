@@ -29,6 +29,13 @@ const (
 	AttrCouple          = "anemos/attribute:anemos:noop:couple"
 )
 
+const (
+	AttrNameSuccessDuration = "duration/success"
+	AttrNameFailDuration    = "duration/fail"
+	AttrNameRetries         = "reties"
+	AttrNameCouple          = "couple"
+)
+
 type MetaData string
 
 type NoopTask struct {

@@ -40,7 +40,7 @@ func NewNode() (*Node) {
 
 func LinkDown(from anemos.Node, to anemos.Node) {
 	name := fmt.Sprint("%s>%s", from.ShortName(), to.ShortName())
-	LinkDownNamed(from,to, name)
+	LinkDownNamed(from, to, name)
 }
 
 func LinkDownNamed(from anemos.Node, to anemos.Node, name string) {
@@ -79,22 +79,26 @@ func (n *Node) SetRouter(router anemos.Router) () {
 
 func NewTaskNode() (*TaskNode) {
 	return &TaskNode{
-		Node: NewNode(),
-		//nodes: make([]anemos.Node,0),
+		Node:       NewNode(),
+		Attributes: make(map[string]string, 0),
+		Instances:  make([]*api.TaskInstance, 0),
 	}
 }
 
 type TaskNode struct {
 	*Node
-	Provider  string
-	Operation string
+	Provider   string
+	Operation  string
+	Attributes map[string]string
+
+	Instances []*api.TaskInstance
 }
 
 func (n *TaskNode) OnEvent(event *api.Event) {
-	logOn(n,"TaskNode", "OnEvent", event)
+	logOn(n, "TaskNode", "OnEvent", event)
 	if len(n.upstream) > 0 {
 		for _, node := range n.upstream {
-			if node.Status() != anemos.Success {
+			if !node.EndStateReached() {
 				log.Printf("TaskNode.OnEvent: Not all dependencies are saticfied for %s", n.Name)
 				return
 			}
@@ -102,59 +106,80 @@ func (n *TaskNode) OnEvent(event *api.Event) {
 	}
 
 	def := api.TaskInstance{
-		Provider:  n.Provider,
-		Operation: n.Operation,
-		Name:      n.Name,
-		Id:        fmt.Sprintf("%x", rand.Int63()),
+		Provider:   n.Provider,
+		Operation:  n.Operation,
+		Name:       n.Name,
+		Id:         fmt.Sprintf("%x", rand.Int63()),
+		Attributes: make(map[string]string, 0),
+		Metadata:   make(map[string]string, 0),
 	}
+	for key, value := range n.Attributes {
+		def.Attributes[fmt.Sprintf("anemos/attribute:%s:%s:%s", n.Provider, n.Operation, key)] = value
+	}
+
+	n.Instances = append(n.Instances, &def)
 
 	log.Printf("TaskNode.OnEvent: All dependencies are saticfied for %s", n.Name)
 	n.router.Start(n, &def)
 }
 
 func (n *TaskNode) OnStart(event *api.Event) {
-	logOn(n,"TaskNode", "OnStart", event)
+	logOn(n, "TaskNode", "OnStart", event)
 
 }
 
 func (n *TaskNode) OnProgress(event *api.Event) {
-	logOn(n,"TaskNode", "OnProgress", event)
+	logOn(n, "TaskNode", "OnProgress", event)
 
 }
 
 func (n *TaskNode) OnFinish(event *api.Event) {
-	logOn(n,"TaskNode", "OnFinish", event)
+	logOn(n, "TaskNode", "OnFinish", event)
 	if n.status == anemos.Success {
 		log.Printf("TaskNode.OnFinish: WARNING: Already succeeded")
 		return
 	}
 
-	n.status = anemos.Success
-	if len(n.downstream) > 0 {
-		for _, node := range n.downstream {
-			event := api.Event{
-				Uri: anemos.Uri{
-					Kind:      "anemos/event",
-					Provider:  "anemos",
-					Operation: "parent",
-					Name:      n.Name,
-					Id:        "0000000000000000",
-					Status:    "finished",
-				}.String(),
+	eventUri, _ := anemos.ParseUri(event.Uri)
+	if eventUri.Status == "success" {
+		n.status = anemos.Success
+
+	} else if eventUri.Status == "fail" {
+		n.status = anemos.Fail
+
+	}
+
+	if n.EndStateReached() {
+		if len(n.downstream) > 0 {
+			for _, node := range n.downstream {
+				event := api.Event{
+					Uri: anemos.Uri{
+						Kind:      "anemos/event",
+						Provider:  "anemos",
+						Operation: "parent",
+						Name:      n.Name,
+						Id:        "0000000000000000",
+						Status:    "finished",
+					}.String(),
+				}
+				go node.OnEvent(&event)
 			}
-			go node.OnEvent(&event)
 		}
 	}
 }
 
 func (n *TaskNode) OnCancel(event *api.Event) {
-	logOn(n,"TaskNode", "OnCancel", event)
+	logOn(n, "TaskNode", "OnCancel", event)
 
 }
 
 func (n *TaskNode) OnSkip(event *api.Event) {
-	logOn(n,"TaskNode", "OnSkip", event)
+	logOn(n, "TaskNode", "OnSkip", event)
 
+}
+
+func (n *TaskNode) EndStateReached() (bool) {
+	return n.status == anemos.Success || n.status == anemos.Fail
 }
 
 func NewVirtualNode() (*VirtualNode) {
@@ -179,10 +204,10 @@ type VirtualNode struct {
 }
 
 func (n *VirtualNode) OnEvent(event *api.Event) {
-	logOn(n,"VirtualNode", "OnEvent", event)
+	logOn(n, "VirtualNode", "OnEvent", event)
 	if len(n.upstream) > 0 {
 		for _, node := range n.upstream {
-			if node.Status() != anemos.Success {
+			if !node.EndStateReached() {
 				log.Printf("VirtualNode.OnEvent: Not all dependencies are saticfied for %s", n.Name)
 				return
 			}
@@ -211,17 +236,17 @@ func (n *VirtualNode) OnEvent(event *api.Event) {
 }
 
 func (n *VirtualNode) OnStart(event *api.Event) {
-	logOn(n,"VirtualNode", "OnStart", event)
+	logOn(n, "VirtualNode", "OnStart", event)
 
 }
 
 func (n *VirtualNode) OnProgress(event *api.Event) {
-	logOn(n,"VirtualNode", "OnProgress", event)
+	logOn(n, "VirtualNode", "OnProgress", event)
 
 }
 
 func (n *VirtualNode) OnFinish(event *api.Event) {
-	logOn(n,"VirtualNode", "OnFinish", event)
+	logOn(n, "VirtualNode", "OnFinish", event)
 	if n.status == anemos.Success {
 		log.Printf("VirtualNode.OnFinish: WARNING Already succeeded")
 		return
@@ -237,7 +262,7 @@ func (n *VirtualNode) OnFinish(event *api.Event) {
 					Operation: "parent",
 					Name:      n.Name,
 					Id:        "0000000000000000",
-					Status:    "finshed",
+					Status:    "finished",
 				}.String(),
 			}
 			x := node
@@ -252,13 +277,17 @@ func (n *VirtualNode) OnFinish(event *api.Event) {
 }
 
 func (n *VirtualNode) OnCancel(event *api.Event) {
-	logOn(n,"VirtualNode", "OnCancel", event)
+	logOn(n, "VirtualNode", "OnCancel", event)
 
 }
 
 func (n *VirtualNode) OnSkip(event *api.Event) {
-	logOn(n,"VirtualNode", "OnSkip", event)
+	logOn(n, "VirtualNode", "OnSkip", event)
 
+}
+
+func (n *VirtualNode) EndStateReached() (bool) {
+	return n.status == anemos.Success || n.status == anemos.Fail
 }
 
 type Group struct {
@@ -271,8 +300,8 @@ type Group struct {
 
 func NewGroup() (*Group) {
 	return &Group{
-		Node:  &Node{},
-		nodes: make([]anemos.Node, 0),
+		Node:    &Node{},
+		nodes:   make([]anemos.Node, 0),
 		channel: make(chan bool),
 	}
 }
@@ -316,31 +345,35 @@ func (g *Group) SetRouter(router anemos.Router) () {
 }
 
 func (g *Group) OnEvent(event *api.Event) {
-	logOn(g,"Group", "OnEvent", event)
+	logOn(g, "Group", "OnEvent", event)
 	g.begin.OnEvent(event)
 }
 
 func (g *Group) OnStart(event *api.Event) {
-	logOn(g,"Group", "OnStart", event)
+	logOn(g, "Group", "OnStart", event)
 
 }
 
 func (g *Group) OnProgress(event *api.Event) {
-	logOn(g,"Group", "OnProgress", event)
+	logOn(g, "Group", "OnProgress", event)
 
 }
 
 func (g *Group) OnFinish(event *api.Event) {
-	logOn(g,"Group", "OnFinish", event)
+	logOn(g, "Group", "OnFinish", event)
 
 }
 
 func (g *Group) OnCancel(event *api.Event) {
-	logOn(g,"Group", "OnCancel", event)
+	logOn(g, "Group", "OnCancel", event)
 
 }
 
 func (g *Group) OnSkip(event *api.Event) {
-	logOn(g,"Group", "OnSkip", event)
+	logOn(g, "Group", "OnSkip", event)
 
+}
+
+func (n *Group) EndStateReached() (bool) {
+	return false
 }

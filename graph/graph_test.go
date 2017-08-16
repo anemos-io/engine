@@ -25,13 +25,13 @@ func NewSuccessTask(name string) (*TaskNode) {
 	return node
 }
 
-func StartGroupForSuccess(g *Group, t *testing.T) {
+func StartGroupForSuccess(g *Group, expectSuccess bool, t *testing.T) {
 	event := api.Event{
 		Uri: "anemos/event:manual",
 	}
 
 	go g.OnEvent(&event)
-	assert.Equal(t, true, <-g.channel)
+	assert.Equal(t, expectSuccess, <-g.channel)
 
 }
 
@@ -52,7 +52,7 @@ func TestTwoTasks(t *testing.T) {
 
 	r.RegisterGroup(g)
 
-	StartGroupForSuccess(g, t)
+	StartGroupForSuccess(g, true, t)
 
 	assert.Equal(t, anemos.Success, task1.Status())
 	assert.Equal(t, anemos.Success, task2.Status())
@@ -78,7 +78,7 @@ func TestSimpleSplit(t *testing.T) {
 
 	r.RegisterGroup(g)
 
-	StartGroupForSuccess(g, t)
+	StartGroupForSuccess(g, true, t)
 
 	assert.Equal(t, anemos.Success, task1.Status())
 	assert.Equal(t, anemos.Success, task2.Status())
@@ -105,7 +105,7 @@ func TestSimpleJoin(t *testing.T) {
 
 	r.RegisterGroup(g)
 
-	StartGroupForSuccess(g, t)
+	StartGroupForSuccess(g, true, t)
 
 	assert.Equal(t, anemos.Success, task1.Status())
 	assert.Equal(t, anemos.Success, task2.Status())
@@ -136,7 +136,7 @@ func TestSimpleSplitAndJoin(t *testing.T) {
 
 	r.RegisterGroup(g)
 
-	StartGroupForSuccess(g, t)
+	StartGroupForSuccess(g, true, t)
 
 	assert.Equal(t, anemos.Success, task1.Status())
 	assert.Equal(t, anemos.Success, task2.Status())
@@ -159,7 +159,7 @@ func TestSingleFail(t *testing.T) {
 
 	r.RegisterGroup(g)
 
-	StartGroupForSuccess(g, t)
+	StartGroupForSuccess(g, false, t)
 
 	assert.Equal(t, anemos.Fail, task1.Status())
 }

@@ -214,16 +214,6 @@ func (n *VirtualNode) OnEvent(event *api.Event) {
 		}
 	}
 
-	if len(n.downstream) > 0 {
-		for _, node := range n.downstream {
-			//event := api.Event{
-			//	Uri: "anemos/event:parent",
-			//}
-			x := node
-			go x.OnEvent(event)
-		}
-	}
-
 	def := api.TaskInstance{
 		Provider:  "anemos",
 		Operation: "virtual",
@@ -252,7 +242,24 @@ func (n *VirtualNode) OnFinish(event *api.Event) {
 		return
 	}
 
-	n.status = anemos.Success
+	// rules
+	status := anemos.Success
+	if len(n.upstream) > 0 {
+		for _, node := range n.upstream {
+			if node.Status() == anemos.Fail {
+				status = anemos.Fail
+			}
+			//if !node.EndStateReached() {
+			//	log.Printf("VirtualNode.OnEvent: Not all dependencies are saticfied for %s", n.Name)
+			//	return
+			//}
+		}
+	}
+
+	// eventUri, _ := anemos.ParseUri(event.Uri)
+	// status
+
+	n.status = status
 	if len(n.downstream) > 0 {
 		for _, node := range n.downstream {
 			event := api.Event{
@@ -272,7 +279,8 @@ func (n *VirtualNode) OnFinish(event *api.Event) {
 	if n.parent != nil && n.kind == End {
 		log.Printf("VirtualNode[%s].OnFinish: End node reached for group %s", n.ShortName(),
 			n.parent.ShortName())
-		n.parent.channel <- true
+		n.parent.status = n.status
+		n.parent.channel <- n.status == anemos.Success
 	}
 }
 

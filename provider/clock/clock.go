@@ -67,8 +67,6 @@ func (c *ClockObserver) Trigger(element *list.Element) {
 	event.Metadata["anemos/metadata:task:timestamp"] = time.Now().Format(time.RFC3339Nano)
 	c.channel <- &event
 
-	fmt.Sprint()
-
 	fmt.Println(val.uri)
 	c.ticks.Remove(element)
 }

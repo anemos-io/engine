@@ -12,12 +12,13 @@ type NodeInstanceStatus int
 
 const (
 	Unknown     NodeInstanceStatus = iota
+	Retry
 	Initialized
 	Queue
 	Start
 	Success
+	Skip
 	Fail
-	Retry
 )
 
 type Node interface {
@@ -48,6 +49,7 @@ type Group interface {
 type ResourceRouter interface {
 	Start(node Node, instance *api.TaskInstance)
 	StartVirtual(node Node, instance *api.TaskInstance)
+	Fail(node Node, instance *api.TaskInstance)
 }
 
 type EventRouter interface {

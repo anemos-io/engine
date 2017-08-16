@@ -164,6 +164,30 @@ func TestSingleFail(t *testing.T) {
 	assert.Equal(t, anemos.Fail, task1.Status())
 }
 
+func TestFailPropagation(t *testing.T) {
+
+	r := router.NewInternalRouter()
+
+	task1 := NewSuccessTask("task1")
+	task1.Attributes[noop.AttrNameRetries] = "1"
+	task2 := NewSuccessTask("task2")
+	//task2.Attributes[noop.AttrNameRetries] = "1"
+	LinkDown(task1, task2)
+
+	g := NewGroup()
+	g.Name = "group"
+
+	g.AddNode(task1)
+	g.AddNode(task2)
+	g.Resolve()
+
+	r.RegisterGroup(g)
+
+	StartGroupForSuccess(g, false, t)
+
+	assert.Equal(t, anemos.Fail, task1.Status())
+}
+
 //func TestStress(t *testing.T) {
 //
 //	r := router.NewInternalRouter()

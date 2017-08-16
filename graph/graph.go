@@ -39,7 +39,7 @@ func NewNode() (*Node) {
 }
 
 func LinkDown(from anemos.Node, to anemos.Node) {
-	name := fmt.Sprint("%s>%s", from.ShortName(), to.ShortName())
+	name := fmt.Sprintf("%s>%s", from.ShortName(), to.ShortName())
 	LinkDownNamed(from, to, name)
 }
 
@@ -96,41 +96,48 @@ type TaskNode struct {
 
 func (n *TaskNode) OnEvent(event *api.Event) {
 	logOn(n, "TaskNode", "OnEvent", event)
+	status := anemos.Success
 	if len(n.upstream) > 0 {
 		for _, node := range n.upstream {
 			if !node.EndStateReached() {
 				log.Printf("TaskNode.OnEvent: Not all dependencies are saticfied for %s", n.Name)
 				return
+			} else  {
+				if node.Status() == anemos.Fail && status < anemos.Fail {
+					status = anemos.Fail
+				} else if node.Status() == anemos.Skip && status < anemos.Skip {
+					// TODO: Skip? Defaults to success
+				}
 			}
 		}
 	}
 
-	def := api.TaskInstance{
-		Provider:   n.Provider,
-		Operation:  n.Operation,
-		Name:       n.Name,
-		Id:         fmt.Sprintf("%x", rand.Int63()),
-		Attributes: make(map[string]string, 0),
-		Metadata:   make(map[string]string, 0),
+	if status == anemos.Success {
+		log.Printf("TaskNode[%s].OnEvent: All dependencies are saticfied.", n.Name)
+		def := api.TaskInstance{
+			Provider:   n.Provider,
+			Operation:  n.Operation,
+			Name:       n.Name,
+			Id:         fmt.Sprintf("%x", rand.Int63()),
+			Attributes: make(map[string]string, 0),
+			Metadata:   make(map[string]string, 0),
+		}
+		for key, value := range n.Attributes {
+			def.Attributes[fmt.Sprintf("anemos/attribute:%s:%s:%s", n.Provider, n.Operation, key)] = value
+		}
+		n.Instances = append(n.Instances, &def)
+
+		n.router.Start(n, &def)
+	} else {
+		log.Printf("TaskNode[%s].OnEvent: Dependency have failure, fail and finish.", n.Name)
+		def := api.TaskInstance{
+			Provider:  "anemos",
+			Operation: "virtual",
+			Name:      n.Name,
+			Id:        fmt.Sprintf("%x", rand.Int63()),
+		}
+		n.router.Fail(n, &def)
 	}
-	for key, value := range n.Attributes {
-		def.Attributes[fmt.Sprintf("anemos/attribute:%s:%s:%s", n.Provider, n.Operation, key)] = value
-	}
-
-	n.Instances = append(n.Instances, &def)
-
-	log.Printf("TaskNode.OnEvent: All dependencies are saticfied for %s", n.Name)
-	n.router.Start(n, &def)
-}
-
-func (n *TaskNode) OnStart(event *api.Event) {
-	logOn(n, "TaskNode", "OnStart", event)
-
-}
-
-func (n *TaskNode) OnProgress(event *api.Event) {
-	logOn(n, "TaskNode", "OnProgress", event)
-
 }
 
 func (n *TaskNode) OnFinish(event *api.Event) {
@@ -141,13 +148,27 @@ func (n *TaskNode) OnFinish(event *api.Event) {
 	}
 
 	eventUri, _ := anemos.ParseUri(event.Uri)
+	status := anemos.Success
 	if eventUri.Status == "success" {
 		n.status = anemos.Success
-
+	} else if eventUri.Status == "finished" {
+		// rules
+		status = anemos.Success
+		if len(n.upstream) > 0 {
+			for _, node := range n.upstream {
+				if node.Status() == anemos.Fail {
+					status = anemos.Fail
+				}
+				//if !node.EndStateReached() {
+				//	log.Printf("VirtualNode.OnEvent: Not all dependencies are saticfied for %s", n.Name)
+				//	return
+				//}
+			}
+		}
 	} else if eventUri.Status == "fail" {
-		n.status = anemos.Fail
-
+		status = anemos.Fail
 	}
+	n.status = status
 
 	if n.EndStateReached() {
 		if len(n.downstream) > 0 {
@@ -168,6 +189,16 @@ func (n *TaskNode) OnFinish(event *api.Event) {
 	}
 }
 
+func (n *TaskNode) OnStart(event *api.Event) {
+	logOn(n, "TaskNode", "OnStart", event)
+
+}
+
+func (n *TaskNode) OnProgress(event *api.Event) {
+	logOn(n, "TaskNode", "OnProgress", event)
+
+}
+
 func (n *TaskNode) OnCancel(event *api.Event) {
 	logOn(n, "TaskNode", "OnCancel", event)
 
@@ -179,7 +210,7 @@ func (n *TaskNode) OnSkip(event *api.Event) {
 }
 
 func (n *TaskNode) EndStateReached() (bool) {
-	return n.status == anemos.Success || n.status == anemos.Fail
+	return n.status == anemos.Success || n.status == anemos.Fail || n.status == anemos.Skip
 }
 
 func NewVirtualNode() (*VirtualNode) {
@@ -205,6 +236,7 @@ type VirtualNode struct {
 
 func (n *VirtualNode) OnEvent(event *api.Event) {
 	logOn(n, "VirtualNode", "OnEvent", event)
+
 	if len(n.upstream) > 0 {
 		for _, node := range n.upstream {
 			if !node.EndStateReached() {
@@ -223,16 +255,6 @@ func (n *VirtualNode) OnEvent(event *api.Event) {
 
 	log.Printf("VirtualNode.OnEvent: All dependencies are saticfied for %s", n.Name)
 	n.router.StartVirtual(n, &def)
-}
-
-func (n *VirtualNode) OnStart(event *api.Event) {
-	logOn(n, "VirtualNode", "OnStart", event)
-
-}
-
-func (n *VirtualNode) OnProgress(event *api.Event) {
-	logOn(n, "VirtualNode", "OnProgress", event)
-
 }
 
 func (n *VirtualNode) OnFinish(event *api.Event) {
@@ -284,6 +306,16 @@ func (n *VirtualNode) OnFinish(event *api.Event) {
 	}
 }
 
+func (n *VirtualNode) OnStart(event *api.Event) {
+	logOn(n, "VirtualNode", "OnStart", event)
+
+}
+
+func (n *VirtualNode) OnProgress(event *api.Event) {
+	logOn(n, "VirtualNode", "OnProgress", event)
+
+}
+
 func (n *VirtualNode) OnCancel(event *api.Event) {
 	logOn(n, "VirtualNode", "OnCancel", event)
 
@@ -326,12 +358,12 @@ func (g *Group) Resolve() {
 
 	for _, node := range g.nodes {
 		if len(node.Upstream()) == 0 {
-			name := fmt.Sprint("%s>%s", g.begin.ShortName(), node.ShortName())
+			name := fmt.Sprintf("%s>%s", g.begin.ShortName(), node.ShortName())
 			log.Printf("Group Resolver: Adding link for %s", name)
 			LinkDown(g.begin, node)
 		}
 		if len(node.Downstream()) == 0 {
-			name := fmt.Sprint("%s>%s", node.ShortName(), g.end.ShortName())
+			name := fmt.Sprintf("%s>%s", node.ShortName(), g.end.ShortName())
 			log.Printf("Group Resolver: Adding link for %s", name)
 			LinkDown(node, g.end)
 		}

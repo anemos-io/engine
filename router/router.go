@@ -9,8 +9,7 @@ import (
 	"github.com/anemos-io/engine"
 	"fmt"
 	"log"
-		"sync"
-
+	"sync"
 )
 
 type InternalResourceRouter struct {
@@ -27,7 +26,7 @@ type InternalRouter struct {
 	*InternalResourceRouter
 	*InternalEventRouter
 	instances map[string]anemos.Node
-	mutex sync.Mutex
+	mutex     sync.Mutex
 }
 
 func (r *InternalRouter) ObserverLoop() {
@@ -84,10 +83,32 @@ func (r *InternalRouter) StartVirtual(node anemos.Node, instance *api.TaskInstan
 
 	event := api.Event{
 		Uri: anemos.Uri{
-			Provider:instance.Provider,
-			Operation:instance.Operation,
-			Name:instance.Name,
-			Id:instance.Id,
+			Kind:      "anemos/event",
+			Provider:  instance.Provider,
+			Operation: instance.Operation,
+			Name:      instance.Name,
+			Id:        instance.Id,
+			Status:    "finished",
+		}.String(),
+	}
+	r.Trigger(&event)
+}
+
+func (r *InternalRouter) Fail(node anemos.Node, instance *api.TaskInstance) {
+	iid := fmt.Sprintf("%s:%s:%s:%s", instance.Provider, instance.Operation, instance.Name, instance.Id)
+	log.Printf("InternalRouter.Fail: start iid(%s)\n", iid)
+	r.mutex.Lock()
+	r.instances[iid] = node
+	r.mutex.Unlock()
+
+	event := api.Event{
+		Uri: anemos.Uri{
+			Kind:      "anemos/event",
+			Provider:  instance.Provider,
+			Operation: instance.Operation,
+			Name:      instance.Name,
+			Id:        instance.Id,
+			Status:    "fail",
 		}.String(),
 	}
 	r.Trigger(&event)

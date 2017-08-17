@@ -32,7 +32,6 @@ func StartGroupForSuccess(g *Group, expectSuccess bool, t *testing.T) {
 
 	go g.OnEvent(&event)
 	assert.Equal(t, expectSuccess, <-g.channel)
-
 }
 
 func TestTwoTasks(t *testing.T) {
@@ -56,6 +55,7 @@ func TestTwoTasks(t *testing.T) {
 
 	assert.Equal(t, anemos.Success, task1.Status())
 	assert.Equal(t, anemos.Success, task2.Status())
+	assert.Equal(t, anemos.Success, g.Status())
 }
 
 func TestSimpleSplit(t *testing.T) {
@@ -83,6 +83,7 @@ func TestSimpleSplit(t *testing.T) {
 	assert.Equal(t, anemos.Success, task1.Status())
 	assert.Equal(t, anemos.Success, task2.Status())
 	assert.Equal(t, anemos.Success, task3.Status())
+	assert.Equal(t, anemos.Success, g.Status())
 }
 
 func TestSimpleJoin(t *testing.T) {
@@ -110,6 +111,7 @@ func TestSimpleJoin(t *testing.T) {
 	assert.Equal(t, anemos.Success, task1.Status())
 	assert.Equal(t, anemos.Success, task2.Status())
 	assert.Equal(t, anemos.Success, task3.Status())
+	assert.Equal(t, anemos.Success, g.Status())
 }
 
 func TestSimpleSplitAndJoin(t *testing.T) {
@@ -142,6 +144,7 @@ func TestSimpleSplitAndJoin(t *testing.T) {
 	assert.Equal(t, anemos.Success, task2.Status())
 	assert.Equal(t, anemos.Success, task3.Status())
 	assert.Equal(t, anemos.Success, task4.Status())
+	assert.Equal(t, anemos.Success, g.Status())
 }
 
 func TestSingleFail(t *testing.T) {
@@ -162,6 +165,7 @@ func TestSingleFail(t *testing.T) {
 	StartGroupForSuccess(g, false, t)
 
 	assert.Equal(t, anemos.Fail, task1.Status())
+	assert.Equal(t, anemos.Fail, g.Status())
 }
 
 func TestFailPropagation(t *testing.T) {
@@ -186,6 +190,70 @@ func TestFailPropagation(t *testing.T) {
 	StartGroupForSuccess(g, false, t)
 
 	assert.Equal(t, anemos.Fail, task1.Status())
+	assert.Equal(t, anemos.Fail, task2.Status())
+	assert.Equal(t, anemos.Fail, g.Status())
+}
+
+func TestFailSplitPropagation(t *testing.T) {
+
+	r := router.NewInternalRouter()
+
+	task1 := NewSuccessTask("task1")
+	task1.Attributes[noop.AttrNameRetries] = "1"
+	task2 := NewSuccessTask("task2")
+	task3 := NewSuccessTask("task3")
+	//task2.Attributes[noop.AttrNameRetries] = "1"
+	LinkDown(task1, task2)
+	LinkDown(task1, task3)
+
+	g := NewGroup()
+	g.Name = "group"
+
+	g.AddNode(task1)
+	g.AddNode(task2)
+	g.AddNode(task3)
+	g.Resolve()
+
+	r.RegisterGroup(g)
+
+	StartGroupForSuccess(g, false, t)
+
+	assert.Equal(t, anemos.Fail, task1.Status())
+	assert.Equal(t, anemos.Fail, task2.Status())
+	assert.Equal(t, anemos.Fail, task3.Status())
+	assert.Equal(t, anemos.Fail, g.Status())
+}
+
+func TestFailSplitJoinPropagation(t *testing.T) {
+
+	r := router.NewInternalRouter()
+
+	task1 := NewSuccessTask("task1")
+	task1.Attributes[noop.AttrNameRetries] = "1"
+	task2 := NewSuccessTask("task2")
+	task3 := NewSuccessTask("task3")
+	task4 := NewSuccessTask("task4")
+	//task2.Attributes[noop.AttrNameRetries] = "1"
+	LinkDown(task1, task2)
+	LinkDown(task1, task3)
+
+	g := NewGroup()
+	g.Name = "group"
+
+	g.AddNode(task1)
+	g.AddNode(task2)
+	g.AddNode(task3)
+	g.AddNode(task4)
+	g.Resolve()
+
+	r.RegisterGroup(g)
+
+	StartGroupForSuccess(g, false, t)
+
+	assert.Equal(t, anemos.Fail, task1.Status())
+	assert.Equal(t, anemos.Fail, task2.Status())
+	assert.Equal(t, anemos.Fail, task3.Status())
+	assert.Equal(t, anemos.Fail, g.Status())
 }
 
 //func TestStress(t *testing.T) {

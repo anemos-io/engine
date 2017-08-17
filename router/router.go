@@ -114,6 +114,20 @@ func (r *InternalRouter) Fail(node anemos.Node, instance *api.TaskInstance) {
 	r.Trigger(&event)
 }
 
+func (r *InternalRouter) SignalDownstream(node anemos.Node){
+	event := api.Event{
+		Uri: anemos.Uri{
+			Kind:      "anemos/event",
+			Provider:  "anemos",
+			Operation: "parent",
+			Name:      node.ShortName(),
+			Id:        "0000000000000000",
+			Status:    "finished",
+		}.String(),
+	}
+	go node.OnEvent(&event)
+}
+
 func (r *InternalRouter) Trigger(event *api.Event) {
 
 	uri, _ := anemos.ParseUri(event.Uri)

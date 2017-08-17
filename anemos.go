@@ -53,6 +53,7 @@ type ResourceRouter interface {
 }
 
 type EventRouter interface {
+	SignalDownstream(node Node)
 }
 
 type Router interface {

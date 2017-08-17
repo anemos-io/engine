@@ -173,17 +173,7 @@ func (n *TaskNode) OnFinish(event *api.Event) {
 	if n.EndStateReached() {
 		if len(n.downstream) > 0 {
 			for _, node := range n.downstream {
-				event := api.Event{
-					Uri: anemos.Uri{
-						Kind:      "anemos/event",
-						Provider:  "anemos",
-						Operation: "parent",
-						Name:      n.Name,
-						Id:        "0000000000000000",
-						Status:    "finished",
-					}.String(),
-				}
-				go node.OnEvent(&event)
+				n.router.SignalDownstream(node)
 			}
 		}
 	}
@@ -284,18 +274,7 @@ func (n *VirtualNode) OnFinish(event *api.Event) {
 	n.status = status
 	if len(n.downstream) > 0 {
 		for _, node := range n.downstream {
-			event := api.Event{
-				Uri: anemos.Uri{
-					Kind:      "anemos/event",
-					Provider:  "anemos",
-					Operation: "parent",
-					Name:      n.Name,
-					Id:        "0000000000000000",
-					Status:    "finished",
-				}.String(),
-			}
-			x := node
-			go x.OnEvent(&event)
+			n.router.SignalDownstream(node)
 		}
 	}
 	if n.parent != nil && n.kind == End {

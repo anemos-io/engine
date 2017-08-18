@@ -127,7 +127,7 @@ func (n *TaskNode) OnEvent(event *api.Event) {
 		}
 		n.Instances = append(n.Instances, &def)
 
-		n.router.Start(n, &def)
+		n.router.StartTask(n, &def)
 	} else {
 		log.Printf("TaskNode[%s].OnEvent: Dependency have failure, fail and finish.", n.Name)
 		def := api.TaskInstance{

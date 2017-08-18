@@ -9,7 +9,7 @@ import (
 	//"github.com/golang/protobuf/proto"
 	//wkt_timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	//wkt_empty "github.com/golang/protobuf/ptypes/empty"
-	api "github.com/alexvanboxel/scheduler/grpc/anemos/v1alpha1"
+	api "github.com/anemos-io/engine/grpc/anemos/v1alpha1"
 	"log"
 	"io"
 	"fmt"
@@ -28,7 +28,7 @@ type Server struct {
 
 func main() {
 
-	conn, err := grpc.Dial("localhost:5000", grpc.WithInsecure())
+	conn, err := grpc.Dial("localhost:4270", grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
@@ -36,7 +36,6 @@ func main() {
 	executor := api.NewExecutorClient(conn)
 
 	request := api.ExecutorCommandStreamRequest{
-		Uri:"anemos/task:noop",
 	}
 
 	stream, err := executor.CommandStream(context.Background(),&request)

@@ -47,7 +47,7 @@ type Group interface {
 }
 
 type ResourceRouter interface {
-	Start(node Node, instance *api.TaskInstance)
+	StartTask(node Node, instance *api.TaskInstance)
 	StartVirtual(node Node, instance *api.TaskInstance)
 	Fail(node Node, instance *api.TaskInstance)
 }

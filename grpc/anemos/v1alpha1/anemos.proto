@@ -55,8 +55,8 @@ message ObserverCommand {
 }
 
 message ExecutorCommandStreamRequest {
-    string uri = 1;
 }
 
 message ExecutorCommand {
+    TaskInstance instance = 1;
 }

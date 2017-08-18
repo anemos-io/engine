@@ -10,33 +10,75 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
+	"google.golang.org/grpc"
 )
 
-type InternalResourceRouter struct {
+type observerServer struct {
+	router *Router
 }
 
-type InternalEventRouter struct {
+func (s *observerServer) CommandStream(request *api.ObserverCommandStreamRequest, stream api.Observer_CommandStreamServer) error {
+	return nil
 }
 
-type InternalRouter struct {
+type executorServer struct {
+	instances chan api.TaskInstance
+
+	router *Router
+}
+
+func (s *executorServer) CommandStream(request *api.ExecutorCommandStreamRequest, stream api.Executor_CommandStreamServer) error {
+	for {
+		timeout := make(chan bool, 5)
+		go func() {
+			time.Sleep(1 * time.Second)
+			timeout <- true
+		}()
+
+		select {
+		case cmd := <-s.instances:
+			command := api.ExecutorCommand{
+				Instance: &cmd,
+			}
+			stream.Send(&command)
+		case <-timeout:
+			log.Print("Timeout, nothing todo")
+			// the read from ch has timed out
+		}
+	}
+
+	return nil
+}
+
+type ResourceRouter struct {
+}
+
+type EventRouter struct {
+}
+
+type Router struct {
 	Channel  chan *api.Event
 	executor noop.NoopExecutor
 	observer noop.NoopObserver
 
-	*InternalResourceRouter
-	*InternalEventRouter
+	*ResourceRouter
+	*EventRouter
 	instances map[string]anemos.Node
 	mutex     sync.Mutex
+
+	executorServer *executorServer
+	observerServer *observerServer
 }
 
-func (r *InternalRouter) ObserverLoop() {
+func (r *Router) ObserverLoop() {
 	for true {
 		event := <-r.observer.EventChannel
 		r.Trigger(event)
 	}
 }
 
-func NewInternalRouter() (*InternalRouter) {
+func NewRouter(server *grpc.Server) (*Router) {
 	channel := make(chan *api.Event)
 
 	executor := noop.NoopExecutor{}
@@ -45,23 +87,36 @@ func NewInternalRouter() (*InternalRouter) {
 	}
 	executor.CoupleObserver(&observer)
 
-	router := &InternalRouter{
+	router := &Router{
 		Channel:  channel,
 		executor: executor,
 		observer: observer,
 
 		instances: make(map[string]anemos.Node),
 
-		InternalEventRouter:    &InternalEventRouter{},
-		InternalResourceRouter: &InternalResourceRouter{},
+		EventRouter:    &EventRouter{},
+		ResourceRouter: &ResourceRouter{},
 	}
-	go router.ObserverLoop()
+
+	observerApi := &observerServer{}
+	observerApi.router = router
+	router.observerServer = observerApi
+	executorApi := &executorServer{
+		instances: make(chan api.TaskInstance),
+	}
+	executorApi.router = router
+	router.executorServer = executorApi
+
+	api.RegisterObserverServer(server, observerApi)
+	api.RegisterExecutorServer(server, executorApi)
+
+	//go router.ObserverLoop()
 	return router
 }
 
-func (r *InternalRouter) StartTask(node anemos.Node, instance *api.TaskInstance) {
+func (r *Router) StartTask(node anemos.Node, instance *api.TaskInstance) {
 	iid := fmt.Sprintf("%s:%s:%s:%s", instance.Provider, instance.Operation, instance.Name, instance.Id)
-	log.Printf("InternalRouter.StartTask: iid(%s) and execute\n", iid)
+	log.Printf("Router.StartTask: iid(%s) and execute\n", iid)
 	r.mutex.Lock()
 	r.instances[iid] = node
 	r.mutex.Unlock()
@@ -74,9 +129,9 @@ func (r *InternalRouter) StartTask(node anemos.Node, instance *api.TaskInstance)
 	//node.
 }
 
-func (r *InternalRouter) StartVirtual(node anemos.Node, instance *api.TaskInstance) {
+func (r *Router) StartVirtual(node anemos.Node, instance *api.TaskInstance) {
 	iid := fmt.Sprintf("%s:%s:%s:%s", instance.Provider, instance.Operation, instance.Name, instance.Id)
-	log.Printf("InternalRouter.StartVirtual: start iid(%s)\n", iid)
+	log.Printf("Router.StartVirtual: start iid(%s)\n", iid)
 	r.mutex.Lock()
 	r.instances[iid] = node
 	r.mutex.Unlock()
@@ -94,9 +149,9 @@ func (r *InternalRouter) StartVirtual(node anemos.Node, instance *api.TaskInstan
 	r.Trigger(&event)
 }
 
-func (r *InternalRouter) Fail(node anemos.Node, instance *api.TaskInstance) {
+func (r *Router) Fail(node anemos.Node, instance *api.TaskInstance) {
 	iid := fmt.Sprintf("%s:%s:%s:%s", instance.Provider, instance.Operation, instance.Name, instance.Id)
-	log.Printf("InternalRouter.Fail: start iid(%s)\n", iid)
+	log.Printf("Router.Fail: start iid(%s)\n", iid)
 	r.mutex.Lock()
 	r.instances[iid] = node
 	r.mutex.Unlock()
@@ -114,7 +169,7 @@ func (r *InternalRouter) Fail(node anemos.Node, instance *api.TaskInstance) {
 	r.Trigger(&event)
 }
 
-func (r *InternalRouter) SignalDownstream(node anemos.Node){
+func (r *Router) SignalDownstream(node anemos.Node) {
 	event := api.Event{
 		Uri: anemos.Uri{
 			Kind:      "anemos/event",
@@ -128,11 +183,11 @@ func (r *InternalRouter) SignalDownstream(node anemos.Node){
 	go node.OnEvent(&event)
 }
 
-func (r *InternalRouter) Trigger(event *api.Event) {
+func (r *Router) Trigger(event *api.Event) {
 
 	uri, _ := anemos.ParseUri(event.Uri)
 	iid := fmt.Sprintf("%s:%s:%s:%s", uri.Provider, uri.Operation, uri.Name, uri.Id)
-	log.Printf("InternalRouter.Trigger: iid(%s) and finish\n", iid)
+	log.Printf("Router.Trigger: iid(%s) and finish\n", iid)
 
 	r.mutex.Lock()
 	node := r.instances[iid]
@@ -146,6 +201,6 @@ func (r *InternalRouter) Trigger(event *api.Event) {
 	//node.
 }
 
-func (r *InternalRouter) RegisterGroup(group anemos.Group) {
+func (r *Router) RegisterGroup(group anemos.Group) {
 	group.SetRouter(r)
 }

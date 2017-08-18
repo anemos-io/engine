@@ -1,12 +1,14 @@
 kind: anemos/dag
 version: v1
 metaData:
-  name: three-node-simple
+  name: three-task-simple
 tasks:
 - name: task-start
-  task: anemos:noop
+#  task: anemos:noop
   downstream:
-  - name: task-left
-    task: anemos:noop
-  - name: task-right
-    task: anemos:noop
+  - task:
+      name: task-left
+#    task: anemos:noop
+  - task:
+      name: task-right
+#    task: anemos:noop

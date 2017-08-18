@@ -1,15 +1,15 @@
 kind: anemos/dag
 version: v1
 metaData:
-  name: three-node-flat
+  name: three-task-binding
 tasks:
 - name: task-start
-- name: task-top
-- name: task-bottom
-binding:
+- name: task-left
+- name: task-right
+bindings:
 - taskRef: task-start
   downstream:
-  - taskRef: task-top
-- taskRef: task-bottom
+  - taskRef: task-left
+- taskRef: task-right
   upstream:
   - taskRef: task-start

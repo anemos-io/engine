@@ -10,8 +10,8 @@ import (
 	//wkt_timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	//wkt_empty "github.com/golang/protobuf/ptypes/empty"
 	api "github.com/anemos-io/engine/grpc/anemos/v1alpha1"
-	"log"
 	"io"
+	"log"
 )
 
 const (
@@ -34,12 +34,9 @@ func main() {
 	defer conn.Close()
 	executor := api.NewExecutorClient(conn)
 
-	request := api.ExecutorCommandStreamRequest{
-		Uri:"anemos/task:clock",
-	}
+	request := api.ExecutorCommandStreamRequest{}
 
-
-	stream, err := executor.CommandStream(context.Background(),&request)
+	stream, err := executor.CommandStream(context.Background(), &request)
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
@@ -54,6 +51,5 @@ func main() {
 		}
 		log.Println(command)
 	}
-
 
 }

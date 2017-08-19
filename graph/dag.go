@@ -3,12 +3,12 @@ package graph
 import (
 	//"fmt"
 	//"github.com/ghodss/yaml"
-	"io/ioutil"
 	"gopkg.in/yaml.v2"
+	"io/ioutil"
 
-	"log"
 	"fmt"
 	"github.com/anemos-io/engine"
+	"log"
 )
 
 type TaskConfig struct {
@@ -41,7 +41,7 @@ type binding struct {
 	up   string
 }
 
-func parseTask(builder *builder, config map[interface{}]interface{}, parent anemos.Node) (anemos.Node) {
+func parseTask(builder *builder, config map[interface{}]interface{}, parent anemos.Node) anemos.Node {
 	name := config["name"].(string)
 
 	task := NewTaskNode()
@@ -79,11 +79,14 @@ func parseTask(builder *builder, config map[interface{}]interface{}, parent anem
 
 }
 
-func ParseDag(filename string) *Group {
-	data, err := ioutil.ReadFile(filename)
-	dagConfig := make(map[interface{}]interface{})
+func ParseDagFile(filename string) *Group {
+	data, _ := ioutil.ReadFile(filename)
+	return ParseDag(data)
+}
 
-	err = yaml.Unmarshal([]byte(data), &dagConfig)
+func ParseDag(data []byte) *Group {
+	dagConfig := make(map[interface{}]interface{})
+	err := yaml.Unmarshal(data, &dagConfig)
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
@@ -141,7 +144,6 @@ func ParseDag(filename string) *Group {
 
 		}
 	}
-
 
 	for _, v := range builder.nodes {
 		group.AddNode(v)

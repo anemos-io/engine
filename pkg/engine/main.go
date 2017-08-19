@@ -3,13 +3,15 @@ package main
 import (
 	"log"
 	//"golang.org/x/net/context"
-	"net"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+	"net"
 	//"github.com/golang/protobuf/proto"
 	//wkt_timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	//wkt_empty "github.com/golang/protobuf/ptypes/empty"
+	"fmt"
 	"github.com/anemos-io/engine/router"
+	"github.com/anemos-io/engine/store"
 )
 
 const (
@@ -17,6 +19,9 @@ const (
 )
 
 func main() {
+
+	st := store.NewGraphStore()
+	fmt.Println(st)
 
 	listener, err := net.Listen("tcp", port)
 	if err != nil {
@@ -29,9 +34,6 @@ func main() {
 	// Register reflection service on gRPC.
 	reflection.Register(s)
 	log.Println("Starting Anemos Engine")
-
-
-
 
 	if err := s.Serve(listener); err != nil {
 		log.Fatalf("failed to serve: %v", err)

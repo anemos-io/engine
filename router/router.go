@@ -51,19 +51,11 @@ func (s *executorServer) CommandStream(request *api.ExecutorCommandStreamRequest
 	return nil
 }
 
-type ResourceRouter struct {
-}
-
-type EventRouter struct {
-}
-
 type Router struct {
 	Channel  chan *api.Event
 	executor noop.NoopExecutor
 	observer noop.NoopObserver
 
-	*ResourceRouter
-	*EventRouter
 	instances map[string]anemos.Node
 	mutex     sync.Mutex
 
@@ -93,24 +85,23 @@ func NewRouter(server *grpc.Server) *Router {
 		observer: observer,
 
 		instances: make(map[string]anemos.Node),
-
-		EventRouter:    &EventRouter{},
-		ResourceRouter: &ResourceRouter{},
 	}
 
-	observerApi := &observerServer{}
-	observerApi.router = router
-	router.observerServer = observerApi
-	executorApi := &executorServer{
-		instances: make(chan api.TaskInstance),
+	if server != nil {
+		observerApi := &observerServer{}
+		observerApi.router = router
+		router.observerServer = observerApi
+		executorApi := &executorServer{
+			instances: make(chan api.TaskInstance),
+		}
+		executorApi.router = router
+		router.executorServer = executorApi
+
+		api.RegisterObserverServer(server, observerApi)
+		api.RegisterExecutorServer(server, executorApi)
 	}
-	executorApi.router = router
-	router.executorServer = executorApi
 
-	api.RegisterObserverServer(server, observerApi)
-	api.RegisterExecutorServer(server, executorApi)
-
-	//go router.ObserverLoop()
+	go router.ObserverLoop()
 	return router
 }
 

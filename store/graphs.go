@@ -11,27 +11,27 @@ import (
 
 func NewGraphStore() *GraphStore {
 	gs := &GraphStore{
-		graphs: make(map[string]*graph.Group),
+		Graphs: make(map[string]*graph.Group),
 	}
 	gs.LoadAll()
 
-	log.Printf("Loaded %d graphs", len(gs.graphs))
+	log.Printf("Loaded %d Graphs", len(gs.Graphs))
 	return gs
 }
 
 type GraphStore struct {
-	graphs map[string]*graph.Group
+	Graphs map[string]*graph.Group
 }
 
 func (g *GraphStore) LoadAll() {
 
 	home := os.Getenv("HOME")
-	base := ".anemos/graphs"
+	base := ".anemos/Graphs"
 	dirs, _ := ioutil.ReadDir(fmt.Sprintf("%s/%s", home, base))
 	for _, dir := range dirs {
 		fn := fmt.Sprintf("%s/%s/%s", home, base, dir.Name())
 		group := graph.ParseDagFile(fn)
-		g.graphs[group.Name()] = group
+		g.Graphs[group.Name()] = group
 	}
 
 }

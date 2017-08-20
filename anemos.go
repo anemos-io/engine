@@ -55,19 +55,13 @@ type Session interface {
 	NewTaskInstance(node Node) *api.TaskInstance
 }
 
-type ResourceRouter interface {
+type Router interface {
 	StartTask(node Node, instance *api.TaskInstance)
 	StartVirtual(node Node, instance *api.TaskInstance)
 	Fail(node Node, instance *api.TaskInstance)
-}
 
-type EventRouter interface {
 	SignalDownstream(node Node)
-}
 
-type Router interface {
-	ResourceRouter
-	EventRouter
 	RegisterSession(session Session)
 }
 

@@ -9,7 +9,7 @@ import (
 
 func TestCopySessionShouldNotAffectOriginal(t *testing.T) {
 
-	r := router.NewInternalRouter()
+	r := router.NewRouter(nil)
 
 	task1 := NewSuccessTask("task1")
 	task2 := NewSuccessTask("task2")

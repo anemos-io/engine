@@ -30,7 +30,7 @@ func StartSessionForSuccess(session *Session, expectSuccess bool, t *testing.T) 
 
 func TestTwoTasks(t *testing.T) {
 
-	r := router.NewInternalRouter()
+	r := router.NewRouter(nil)
 
 	task1 := NewSuccessTask("task1")
 	task2 := NewSuccessTask("task2")
@@ -56,7 +56,7 @@ func TestTwoTasks(t *testing.T) {
 
 func TestSimpleSplit(t *testing.T) {
 
-	r := router.NewInternalRouter()
+	r := router.NewRouter(nil)
 
 	task1 := NewSuccessTask("task1")
 	task2 := NewSuccessTask("task2")
@@ -86,7 +86,7 @@ func TestSimpleSplit(t *testing.T) {
 
 func TestSimpleJoin(t *testing.T) {
 
-	r := router.NewInternalRouter()
+	r := router.NewRouter(nil)
 
 	task1 := NewSuccessTask("task1")
 	task2 := NewSuccessTask("task2")
@@ -116,7 +116,7 @@ func TestSimpleJoin(t *testing.T) {
 
 func TestSimpleSplitAndJoin(t *testing.T) {
 
-	r := router.NewInternalRouter()
+	r := router.NewRouter(nil)
 
 	task1 := NewSuccessTask("task1")
 	task2 := NewSuccessTask("task2")
@@ -151,7 +151,7 @@ func TestSimpleSplitAndJoin(t *testing.T) {
 
 func TestSingleFail(t *testing.T) {
 
-	r := router.NewInternalRouter()
+	r := router.NewRouter(nil)
 
 	task1 := NewSuccessTask("task1")
 	task1.attributes[noop.AttrNameRetries] = "1"
@@ -174,7 +174,7 @@ func TestSingleFail(t *testing.T) {
 
 func TestFailPropagation(t *testing.T) {
 
-	r := router.NewInternalRouter()
+	r := router.NewRouter(nil)
 
 	task1 := NewSuccessTask("task1")
 	task1.attributes[noop.AttrNameRetries] = "1"
@@ -202,7 +202,7 @@ func TestFailPropagation(t *testing.T) {
 
 func TestFailSplitPropagation(t *testing.T) {
 
-	r := router.NewInternalRouter()
+	r := router.NewRouter(nil)
 
 	task1 := NewSuccessTask("task1")
 	task1.attributes[noop.AttrNameRetries] = "1"
@@ -234,7 +234,7 @@ func TestFailSplitPropagation(t *testing.T) {
 
 func TestFailSplitJoinPropagation(t *testing.T) {
 
-	r := router.NewInternalRouter()
+	r := router.NewRouter(nil)
 
 	task1 := NewSuccessTask("task1")
 	task1.attributes[noop.AttrNameRetries] = "1"

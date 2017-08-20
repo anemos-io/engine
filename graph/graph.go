@@ -318,7 +318,7 @@ func (n *VirtualNode) EndStateReached() bool {
 
 type Group struct {
 	*Node
-	nodes   []anemos.Node
+	nodes   map[string]anemos.Node
 	begin   *VirtualNode
 	end     *VirtualNode
 	channel chan bool
@@ -327,7 +327,7 @@ type Group struct {
 func NewGroup() *Group {
 	return &Group{
 		Node:    &Node{},
-		nodes:   make([]anemos.Node, 0),
+		nodes:   make(map[string]anemos.Node, 0),
 		channel: make(chan bool),
 	}
 }
@@ -344,9 +344,33 @@ func (n *Group) Attributes() map[string]string {
 	return nil
 }
 
+//func CopyNode(source *Node) *Node {
+//
+//}
+
 func CopyGroup(source *Group) *Group {
 
-	return nil
+	destination := NewGroup()
+
+	for _, node := range source.nodes {
+		destinationNode := NewTaskNode()
+		destinationNode.operation = node.Operation()
+		destinationNode.name = node.Name()
+		destinationNode.provider = node.Provider()
+		destinationNode.attributes = node.Attributes()
+		destination.AddNode(destinationNode)
+	}
+	for _, sourceNode := range source.nodes {
+		for bindingName, v := range sourceNode.Downstream() {
+			if bindingName[0] != '$' {
+				up := destination.nodes[sourceNode.Name()]
+				down := destination.nodes[v.Name()]
+				LinkDownNamed(up, down, bindingName)
+			}
+		}
+	}
+	destination.Resolve()
+	return destination
 }
 
 func (g *Group) Resolve() {
@@ -361,21 +385,21 @@ func (g *Group) Resolve() {
 
 	for _, node := range g.nodes {
 		if len(node.Upstream()) == 0 {
-			name := fmt.Sprintf("%s>%s", g.begin.Name(), node.Name())
+			name := fmt.Sprintf("$%s>%s", g.begin.Name(), node.Name())
 			log.Printf("Group Resolver: Adding link for %s", name)
-			LinkDown(g.begin, node)
+			LinkDownNamed(g.begin, node, name)
 		}
 		if len(node.Downstream()) == 0 {
-			name := fmt.Sprintf("%s>%s", node.Name(), g.end.Name())
+			name := fmt.Sprintf("$%s>%s", node.Name(), g.end.Name())
 			log.Printf("Group Resolver: Adding link for %s", name)
-			LinkDown(node, g.end)
+			LinkDownNamed(node, g.end, name)
 		}
 
 	}
 }
 
 func (g *Group) AddNode(node anemos.Node) {
-	g.nodes = append(g.nodes, node)
+	g.nodes[node.Name()] = node
 }
 
 func (g *Group) AssignSession(session anemos.Session) {

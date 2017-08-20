@@ -14,7 +14,7 @@ func Equavalent_Dags(name string, t *testing.T) {
 	assert.Equal(t, 1, len(group.begin.downstream))
 	assert.Equal(t, 2, len(group.end.upstream))
 
-	taskStart := group.begin.downstream[fmt.Sprintf("%s+begin>task-start", name)]
+	taskStart := group.begin.downstream[fmt.Sprintf("$%s+begin>task-start", name)]
 	assert.Equal(t, "task-start", taskStart.Name())
 	assert.Contains(t, taskStart.Downstream(), "task-start>task-left")
 	assert.Equal(t, "task-left", taskStart.Downstream()["task-start>task-left"].Name())

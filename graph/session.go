@@ -45,10 +45,12 @@ func (session *Session) NewTaskInstance(n anemos.Node) *api.TaskInstance {
 	return &def
 }
 
-func NewSession(original *Group) *Session {
+func NewSession(source *Group) *Session {
 
 	session := &Session{
+		id:        1,
 		Instances: make(map[anemos.Node][]*api.TaskInstance, 0),
+		graph:     CopyGroup(source),
 	}
 
 	return session

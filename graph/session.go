@@ -52,6 +52,6 @@ func NewSession(source *Group) *Session {
 		Instances: make(map[anemos.Node][]*api.TaskInstance, 0),
 		graph:     CopyGroup(source),
 	}
-
+	session.graph.AssignSession(session)
 	return session
 }

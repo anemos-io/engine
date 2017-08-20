@@ -1,19 +1,12 @@
 package graph
 
 import (
-	"testing"
-	//"fmt"
-	//"sync"
-	//"github.com/stretchr/testify/assert"
-	api "github.com/anemos-io/engine/grpc/anemos/v1alpha1"
-	"github.com/anemos-io/engine/router"
-	//"fmt"
-	"github.com/stretchr/testify/assert"
-	//"sync"
-	//"fmt"
 	"github.com/anemos-io/engine"
-
+	api "github.com/anemos-io/engine/grpc/anemos/v1alpha1"
 	"github.com/anemos-io/engine/provider/noop"
+	"github.com/anemos-io/engine/router"
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func NewSuccessTask(name string) *TaskNode {
@@ -25,10 +18,11 @@ func NewSuccessTask(name string) *TaskNode {
 	return node
 }
 
-func StartGroupForSuccess(g *Group, expectSuccess bool, t *testing.T) {
+func StartSessionForSuccess(session *Session, expectSuccess bool, t *testing.T) {
 	event := api.Event{
 		Uri: "anemos/event:manual",
 	}
+	g := session.graph
 
 	go g.OnEvent(&event)
 	assert.Equal(t, expectSuccess, <-g.channel)
@@ -53,11 +47,11 @@ func TestTwoTasks(t *testing.T) {
 	g.AssignSession(s)
 	r.RegisterSession(s)
 
-	StartGroupForSuccess(g, true, t)
+	StartSessionForSuccess(s, true, t)
 
-	assert.Equal(t, anemos.Success, task1.Status())
-	assert.Equal(t, anemos.Success, task2.Status())
-	assert.Equal(t, anemos.Success, g.Status())
+	assert.Equal(t, anemos.Success, s.graph.nodes["task1"].Status())
+	assert.Equal(t, anemos.Success, s.graph.nodes["task2"].Status())
+	assert.Equal(t, anemos.Success, s.graph.Status())
 }
 
 func TestSimpleSplit(t *testing.T) {
@@ -82,12 +76,12 @@ func TestSimpleSplit(t *testing.T) {
 	g.AssignSession(s)
 	r.RegisterSession(s)
 
-	StartGroupForSuccess(g, true, t)
+	StartSessionForSuccess(s, true, t)
 
-	assert.Equal(t, anemos.Success, task1.Status())
-	assert.Equal(t, anemos.Success, task2.Status())
-	assert.Equal(t, anemos.Success, task3.Status())
-	assert.Equal(t, anemos.Success, g.Status())
+	assert.Equal(t, anemos.Success, s.graph.nodes["task1"].Status())
+	assert.Equal(t, anemos.Success, s.graph.nodes["task2"].Status())
+	assert.Equal(t, anemos.Success, s.graph.nodes["task3"].Status())
+	assert.Equal(t, anemos.Success, s.graph.Status())
 }
 
 func TestSimpleJoin(t *testing.T) {
@@ -112,12 +106,12 @@ func TestSimpleJoin(t *testing.T) {
 	g.AssignSession(s)
 	r.RegisterSession(s)
 
-	StartGroupForSuccess(g, true, t)
+	StartSessionForSuccess(s, true, t)
 
-	assert.Equal(t, anemos.Success, task1.Status())
-	assert.Equal(t, anemos.Success, task2.Status())
-	assert.Equal(t, anemos.Success, task3.Status())
-	assert.Equal(t, anemos.Success, g.Status())
+	assert.Equal(t, anemos.Success, s.graph.nodes["task1"].Status())
+	assert.Equal(t, anemos.Success, s.graph.nodes["task2"].Status())
+	assert.Equal(t, anemos.Success, s.graph.nodes["task3"].Status())
+	assert.Equal(t, anemos.Success, s.graph.Status())
 }
 
 func TestSimpleSplitAndJoin(t *testing.T) {
@@ -146,13 +140,13 @@ func TestSimpleSplitAndJoin(t *testing.T) {
 	g.AssignSession(s)
 	r.RegisterSession(s)
 
-	StartGroupForSuccess(g, true, t)
+	StartSessionForSuccess(s, true, t)
 
-	assert.Equal(t, anemos.Success, task1.Status())
-	assert.Equal(t, anemos.Success, task2.Status())
-	assert.Equal(t, anemos.Success, task3.Status())
-	assert.Equal(t, anemos.Success, task4.Status())
-	assert.Equal(t, anemos.Success, g.Status())
+	assert.Equal(t, anemos.Success, s.graph.nodes["task1"].Status())
+	assert.Equal(t, anemos.Success, s.graph.nodes["task2"].Status())
+	assert.Equal(t, anemos.Success, s.graph.nodes["task3"].Status())
+	assert.Equal(t, anemos.Success, s.graph.nodes["task4"].Status())
+	assert.Equal(t, anemos.Success, s.graph.Status())
 }
 
 func TestSingleFail(t *testing.T) {
@@ -172,10 +166,10 @@ func TestSingleFail(t *testing.T) {
 	g.AssignSession(s)
 	r.RegisterSession(s)
 
-	StartGroupForSuccess(g, false, t)
+	StartSessionForSuccess(s, false, t)
 
-	assert.Equal(t, anemos.Fail, task1.Status())
-	assert.Equal(t, anemos.Fail, g.Status())
+	assert.Equal(t, anemos.Fail, s.graph.nodes["task1"].Status())
+	assert.Equal(t, anemos.Fail, s.graph.Status())
 }
 
 func TestFailPropagation(t *testing.T) {
@@ -199,11 +193,11 @@ func TestFailPropagation(t *testing.T) {
 	g.AssignSession(s)
 	r.RegisterSession(s)
 
-	StartGroupForSuccess(g, false, t)
+	StartSessionForSuccess(s, false, t)
 
-	assert.Equal(t, anemos.Fail, task1.Status())
-	assert.Equal(t, anemos.Fail, task2.Status())
-	assert.Equal(t, anemos.Fail, g.Status())
+	assert.Equal(t, anemos.Fail, s.graph.nodes["task1"].Status())
+	assert.Equal(t, anemos.Fail, s.graph.nodes["task2"].Status())
+	assert.Equal(t, anemos.Fail, s.graph.Status())
 }
 
 func TestFailSplitPropagation(t *testing.T) {
@@ -230,12 +224,12 @@ func TestFailSplitPropagation(t *testing.T) {
 	g.AssignSession(s)
 	r.RegisterSession(s)
 
-	StartGroupForSuccess(g, false, t)
+	StartSessionForSuccess(s, false, t)
 
-	assert.Equal(t, anemos.Fail, task1.Status())
-	assert.Equal(t, anemos.Fail, task2.Status())
-	assert.Equal(t, anemos.Fail, task3.Status())
-	assert.Equal(t, anemos.Fail, g.Status())
+	assert.Equal(t, anemos.Fail, s.graph.nodes["task1"].Status())
+	assert.Equal(t, anemos.Fail, s.graph.nodes["task2"].Status())
+	assert.Equal(t, anemos.Fail, s.graph.nodes["task3"].Status())
+	assert.Equal(t, anemos.Fail, s.graph.Status())
 }
 
 func TestFailSplitJoinPropagation(t *testing.T) {
@@ -264,12 +258,12 @@ func TestFailSplitJoinPropagation(t *testing.T) {
 	g.AssignSession(s)
 	r.RegisterSession(s)
 
-	StartGroupForSuccess(g, false, t)
+	StartSessionForSuccess(s, false, t)
 
-	assert.Equal(t, anemos.Fail, task1.Status())
-	assert.Equal(t, anemos.Fail, task2.Status())
-	assert.Equal(t, anemos.Fail, task3.Status())
-	assert.Equal(t, anemos.Fail, g.Status())
+	assert.Equal(t, anemos.Fail, s.graph.nodes["task1"].Status())
+	assert.Equal(t, anemos.Fail, s.graph.nodes["task2"].Status())
+	assert.Equal(t, anemos.Fail, s.graph.nodes["task3"].Status())
+	assert.Equal(t, anemos.Fail, s.graph.Status())
 }
 
 //func TestStress(t *testing.T) {
@@ -314,5 +308,5 @@ func TestFailSplitJoinPropagation(t *testing.T) {
 //
 //	g.Resolve()
 //	r.RegisterGroup(g)
-//	StartGroupForSuccess(g, t)
+//	StartSessionForSuccess(g, t)
 //}

@@ -3,33 +3,30 @@ package graph
 import (
 	//"fmt"
 	//"sync"
+	"github.com/anemos-io/engine"
 	api "github.com/anemos-io/engine/grpc/anemos/v1alpha1"
 	"log"
-	"github.com/anemos-io/engine"
 	//"fmt"
 	//"reflect"
-	"math/rand"
 	"fmt"
+	"math/rand"
 	"sync"
 )
 
 func logOn(node anemos.Node, function string, name string, event *api.Event) {
-	log.Printf("%s[%s].%s: %s", function, node.ShortName(), name, event.Uri)
-}
-
-type ResourceRouter struct {
+	log.Printf("%s[%s].%s: %s", function, node.Name(), name, event.Uri)
 }
 
 type Node struct {
-	Name       string
+	name       string
+	session    anemos.Session
 	downstream map[string]anemos.Node
 	upstream   map[string]anemos.Node
-	router     anemos.Router
 	status     anemos.NodeInstanceStatus
 	mutex      sync.Mutex
 }
 
-func NewNode() (*Node) {
+func NewNode() *Node {
 	return &Node{
 		downstream: make(map[string]anemos.Node, 0),
 		upstream:   make(map[string]anemos.Node, 0),
@@ -39,59 +36,68 @@ func NewNode() (*Node) {
 }
 
 func LinkDown(from anemos.Node, to anemos.Node) {
-	name := fmt.Sprintf("%s>%s", from.ShortName(), to.ShortName())
+	name := fmt.Sprintf("%s>%s", from.Name(), to.Name())
 	LinkDownNamed(from, to, name)
 }
 
 func LinkDownNamed(from anemos.Node, to anemos.Node, name string) {
 	from.AddDownstream(name, to)
 	to.AddUpstream(name, from)
-	log.Printf("Link: %s > %s", from.ShortName(), to.ShortName())
+	log.Printf("Link: %s > %s", from.Name(), to.Name())
 }
 
-func (n *Node) ShortName() (string) {
-	return n.Name
+func (n *Node) Name() string {
+	return n.name
 }
 
-func (n *Node) AddUpstream(name string, node anemos.Node) () {
+func (n *Node) AddUpstream(name string, node anemos.Node) {
 	n.upstream[name] = node
 }
 
-func (n *Node) AddDownstream(name string, node anemos.Node) () {
+func (n *Node) AddDownstream(name string, node anemos.Node) {
 	n.downstream[name] = node
 }
 
-func (n *Node) Downstream() (map[string]anemos.Node) {
+func (n *Node) Downstream() map[string]anemos.Node {
 	return n.downstream
 }
 
-func (n *Node) Upstream() (map[string]anemos.Node) {
+func (n *Node) Upstream() map[string]anemos.Node {
 	return n.upstream
 }
 
-func (n *Node) Status() (anemos.NodeInstanceStatus) {
+func (n *Node) Status() anemos.NodeInstanceStatus {
 	return n.status
 }
 
-func (n *Node) SetRouter(router anemos.Router) () {
-	n.router = router
+func (n *Node) AssignSession(session anemos.Session) {
+	n.session = session
 }
 
-func NewTaskNode() (*TaskNode) {
+func NewTaskNode() *TaskNode {
 	return &TaskNode{
 		Node:       NewNode(),
-		Attributes: make(map[string]string, 0),
-		Instances:  make([]*api.TaskInstance, 0),
+		attributes: make(map[string]string, 0),
 	}
 }
 
 type TaskNode struct {
 	*Node
-	Provider   string
-	Operation  string
-	Attributes map[string]string
+	provider   string
+	operation  string
+	attributes map[string]string
+}
 
-	Instances []*api.TaskInstance
+func (n *TaskNode) Provider() string {
+	return n.provider
+}
+
+func (n *TaskNode) Operation() string {
+	return n.operation
+}
+
+func (n *TaskNode) Attributes() map[string]string {
+	return n.attributes
 }
 
 func (n *TaskNode) OnEvent(event *api.Event) {
@@ -100,9 +106,9 @@ func (n *TaskNode) OnEvent(event *api.Event) {
 	if len(n.upstream) > 0 {
 		for _, node := range n.upstream {
 			if !node.EndStateReached() {
-				log.Printf("TaskNode.OnEvent: Not all dependencies are saticfied for %s", n.Name)
+				log.Printf("TaskNode.OnEvent: Not all dependencies are saticfied for %s", n.name)
 				return
-			} else  {
+			} else {
 				if node.Status() == anemos.Fail && status < anemos.Fail {
 					status = anemos.Fail
 				} else if node.Status() == anemos.Skip && status < anemos.Skip {
@@ -113,30 +119,19 @@ func (n *TaskNode) OnEvent(event *api.Event) {
 	}
 
 	if status == anemos.Success {
-		log.Printf("TaskNode[%s].OnEvent: All dependencies are saticfied.", n.Name)
-		def := api.TaskInstance{
-			Provider:   n.Provider,
-			Operation:  n.Operation,
-			Name:       n.Name,
-			Id:         fmt.Sprintf("%x", rand.Int63()),
-			Attributes: make(map[string]string, 0),
-			Metadata:   make(map[string]string, 0),
-		}
-		for key, value := range n.Attributes {
-			def.Attributes[fmt.Sprintf("anemos/attribute:%s:%s:%s", n.Provider, n.Operation, key)] = value
-		}
-		n.Instances = append(n.Instances, &def)
+		def := n.session.NewTaskInstance(n)
+		log.Printf("TaskNode[%s].OnEvent: All dependencies are saticfied.", n.name)
 
-		n.router.StartTask(n, &def)
+		n.session.Router().StartTask(n, def)
 	} else {
-		log.Printf("TaskNode[%s].OnEvent: Dependency have failure, fail and finish.", n.Name)
+		log.Printf("TaskNode[%s].OnEvent: Dependency have failure, fail and finish.", n.name)
 		def := api.TaskInstance{
 			Provider:  "anemos",
 			Operation: "virtual",
-			Name:      n.Name,
+			Name:      n.name,
 			Id:        fmt.Sprintf("%x", rand.Int63()),
 		}
-		n.router.Fail(n, &def)
+		n.session.Router().Fail(n, &def)
 	}
 }
 
@@ -160,7 +155,7 @@ func (n *TaskNode) OnFinish(event *api.Event) {
 					status = anemos.Fail
 				}
 				//if !node.EndStateReached() {
-				//	log.Printf("VirtualNode.OnEvent: Not all dependencies are saticfied for %s", n.Name)
+				//	log.Printf("VirtualNode.OnEvent: Not all dependencies are saticfied for %s", n.name)
 				//	return
 				//}
 			}
@@ -173,7 +168,7 @@ func (n *TaskNode) OnFinish(event *api.Event) {
 	if n.EndStateReached() {
 		if len(n.downstream) > 0 {
 			for _, node := range n.downstream {
-				n.router.SignalDownstream(node)
+				n.session.Router().SignalDownstream(node)
 			}
 		}
 	}
@@ -199,11 +194,11 @@ func (n *TaskNode) OnSkip(event *api.Event) {
 
 }
 
-func (n *TaskNode) EndStateReached() (bool) {
+func (n *TaskNode) EndStateReached() bool {
 	return n.status == anemos.Success || n.status == anemos.Fail || n.status == anemos.Skip
 }
 
-func NewVirtualNode() (*VirtualNode) {
+func NewVirtualNode() *VirtualNode {
 	return &VirtualNode{
 		Node: NewNode(),
 		//nodes: make([]anemos.Node,0),
@@ -213,7 +208,7 @@ func NewVirtualNode() (*VirtualNode) {
 type VirtualNodeType int
 
 const (
-	Solo  VirtualNodeType = iota
+	Solo VirtualNodeType = iota
 	Begin
 	End
 )
@@ -224,13 +219,25 @@ type VirtualNode struct {
 	kind   VirtualNodeType
 }
 
+func (n *VirtualNode) Provider() string {
+	return "anemos"
+}
+
+func (n *VirtualNode) Operation() string {
+	return "virtual"
+}
+
+func (n *VirtualNode) Attributes() map[string]string {
+	return nil
+}
+
 func (n *VirtualNode) OnEvent(event *api.Event) {
 	logOn(n, "VirtualNode", "OnEvent", event)
 
 	if len(n.upstream) > 0 {
 		for _, node := range n.upstream {
 			if !node.EndStateReached() {
-				log.Printf("VirtualNode.OnEvent: Not all dependencies are saticfied for %s", n.Name)
+				log.Printf("VirtualNode.OnEvent: Not all dependencies are saticfied for %s", n.name)
 				return
 			}
 		}
@@ -239,12 +246,12 @@ func (n *VirtualNode) OnEvent(event *api.Event) {
 	def := api.TaskInstance{
 		Provider:  "anemos",
 		Operation: "virtual",
-		Name:      n.Name,
+		Name:      n.name,
 		Id:        fmt.Sprintf("%x", rand.Int63()),
 	}
 
-	log.Printf("VirtualNode.OnEvent: All dependencies are saticfied for %s", n.Name)
-	n.router.StartVirtual(n, &def)
+	log.Printf("VirtualNode.OnEvent: All dependencies are saticfied for %s", n.name)
+	n.session.Router().StartVirtual(n, &def)
 }
 
 func (n *VirtualNode) OnFinish(event *api.Event) {
@@ -262,7 +269,7 @@ func (n *VirtualNode) OnFinish(event *api.Event) {
 				status = anemos.Fail
 			}
 			//if !node.EndStateReached() {
-			//	log.Printf("VirtualNode.OnEvent: Not all dependencies are saticfied for %s", n.Name)
+			//	log.Printf("VirtualNode.OnEvent: Not all dependencies are saticfied for %s", n.name)
 			//	return
 			//}
 		}
@@ -274,12 +281,12 @@ func (n *VirtualNode) OnFinish(event *api.Event) {
 	n.status = status
 	if len(n.downstream) > 0 {
 		for _, node := range n.downstream {
-			n.router.SignalDownstream(node)
+			n.session.Router().SignalDownstream(node)
 		}
 	}
 	if n.parent != nil && n.kind == End {
-		log.Printf("VirtualNode[%s].OnFinish: End node reached for group %s", n.ShortName(),
-			n.parent.ShortName())
+		log.Printf("VirtualNode[%s].OnFinish: End node reached for group %s", n.Name(),
+			n.parent.Name())
 		n.parent.status = n.status
 		n.parent.channel <- n.status == anemos.Success
 	}
@@ -305,7 +312,7 @@ func (n *VirtualNode) OnSkip(event *api.Event) {
 
 }
 
-func (n *VirtualNode) EndStateReached() (bool) {
+func (n *VirtualNode) EndStateReached() bool {
 	return n.status == anemos.Success || n.status == anemos.Fail
 }
 
@@ -317,7 +324,7 @@ type Group struct {
 	channel chan bool
 }
 
-func NewGroup() (*Group) {
+func NewGroup() *Group {
 	return &Group{
 		Node:    &Node{},
 		nodes:   make([]anemos.Node, 0),
@@ -325,24 +332,41 @@ func NewGroup() (*Group) {
 	}
 }
 
+func (n *Group) Provider() string {
+	return "anemos"
+}
+
+func (n *Group) Operation() string {
+	return "group"
+}
+
+func (n *Group) Attributes() map[string]string {
+	return nil
+}
+
+func CopyGroup(source *Group) *Group {
+
+	return nil
+}
+
 func (g *Group) Resolve() {
 	g.begin = NewVirtualNode()
 	g.begin.parent = g
 	g.begin.kind = Begin
-	g.begin.Name = g.Name + "+begin"
+	g.begin.name = g.name + "+begin"
 	g.end = NewVirtualNode()
 	g.end.parent = g
 	g.end.kind = End
-	g.end.Name = g.Name + "+end"
+	g.end.name = g.name + "+end"
 
 	for _, node := range g.nodes {
 		if len(node.Upstream()) == 0 {
-			name := fmt.Sprintf("%s>%s", g.begin.ShortName(), node.ShortName())
+			name := fmt.Sprintf("%s>%s", g.begin.Name(), node.Name())
 			log.Printf("Group Resolver: Adding link for %s", name)
 			LinkDown(g.begin, node)
 		}
 		if len(node.Downstream()) == 0 {
-			name := fmt.Sprintf("%s>%s", node.ShortName(), g.end.ShortName())
+			name := fmt.Sprintf("%s>%s", node.Name(), g.end.Name())
 			log.Printf("Group Resolver: Adding link for %s", name)
 			LinkDown(node, g.end)
 		}
@@ -350,16 +374,16 @@ func (g *Group) Resolve() {
 	}
 }
 
-func (g *Group) AddNode(node anemos.Node) () {
+func (g *Group) AddNode(node anemos.Node) {
 	g.nodes = append(g.nodes, node)
 }
 
-func (g *Group) SetRouter(router anemos.Router) () {
-	g.router = router
-	g.begin.router = router
-	g.end.router = router
+func (g *Group) AssignSession(session anemos.Session) {
+	g.session = session
+	g.begin.session = session
+	g.end.session = session
 	for _, node := range g.nodes {
-		node.SetRouter(router)
+		node.AssignSession(session)
 	}
 }
 
@@ -393,6 +417,6 @@ func (g *Group) OnSkip(event *api.Event) {
 
 }
 
-func (n *Group) EndStateReached() (bool) {
+func (n *Group) EndStateReached() bool {
 	return false
 }

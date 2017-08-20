@@ -46,7 +46,7 @@ func parseTask(builder *builder, config map[interface{}]interface{}, parent anem
 
 	task := NewTaskNode()
 	builder.nodes[name] = task
-	task.Name = name
+	task.name = name
 
 	download, found := config["downstream"]
 	if found {
@@ -56,19 +56,19 @@ func parseTask(builder *builder, config map[interface{}]interface{}, parent anem
 			if found {
 				dt := parseTask(builder, taskConfig, task)
 				//fmt.Println(task)
-				bn := fmt.Sprintf("%s>%s", task.ShortName(), dt.ShortName())
+				bn := fmt.Sprintf("%s>%s", task.Name(), dt.Name())
 				builder.bindings[bn] = binding{
 					name: bn,
-					up:   task.ShortName(),
-					down: dt.ShortName(),
+					up:   task.Name(),
+					down: dt.Name(),
 				}
 			} else {
 				taskRef, found := t["taskRef"].(string)
 				if found {
-					bn := fmt.Sprintf("%s>%s", task.ShortName(), taskRef)
+					bn := fmt.Sprintf("%s>%s", task.Name(), taskRef)
 					builder.bindings[bn] = binding{
 						name: bn,
-						up:   task.ShortName(),
+						up:   task.Name(),
 						down: taskRef,
 					}
 				}
@@ -100,7 +100,7 @@ func ParseDag(data []byte) *Group {
 
 	//
 	group := NewGroup()
-	group.Name = metaData["name"].(string)
+	group.name = metaData["name"].(string)
 
 	tasksConfig := dagConfig["tasks"].([]interface{})
 	fmt.Println(tasksConfig)

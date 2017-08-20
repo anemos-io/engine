@@ -5,13 +5,13 @@ import (
 	//"sync"
 	api "github.com/anemos-io/engine/grpc/anemos/v1alpha1"
 	//	"log"
-	"github.com/anemos-io/engine/provider/noop"
-	"github.com/anemos-io/engine"
 	"fmt"
+	"github.com/anemos-io/engine"
+	"github.com/anemos-io/engine/provider/noop"
+	"google.golang.org/grpc"
 	"log"
 	"sync"
 	"time"
-	"google.golang.org/grpc"
 )
 
 type observerServer struct {
@@ -78,7 +78,7 @@ func (r *Router) ObserverLoop() {
 	}
 }
 
-func NewRouter(server *grpc.Server) (*Router) {
+func NewRouter(server *grpc.Server) *Router {
 	channel := make(chan *api.Event)
 
 	executor := noop.NoopExecutor{}
@@ -175,7 +175,7 @@ func (r *Router) SignalDownstream(node anemos.Node) {
 			Kind:      "anemos/event",
 			Provider:  "anemos",
 			Operation: "parent",
-			Name:      node.ShortName(),
+			Name:      node.Name(),
 			Id:        "0000000000000000",
 			Status:    "finished",
 		}.String(),
@@ -201,6 +201,6 @@ func (r *Router) Trigger(event *api.Event) {
 	//node.
 }
 
-func (r *Router) RegisterGroup(group anemos.Group) {
-	group.SetRouter(r)
+func (r *Router) RegisterSession(session anemos.Session) {
+	session.SetRouter(r)
 }

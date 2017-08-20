@@ -5,9 +5,9 @@ import (
 	//"sync"
 	api "github.com/anemos-io/engine/grpc/anemos/v1alpha1"
 	//	"log"
-	"github.com/anemos-io/engine/provider/noop"
-	"github.com/anemos-io/engine"
 	"fmt"
+	"github.com/anemos-io/engine"
+	"github.com/anemos-io/engine/provider/noop"
 	"log"
 	"sync"
 )
@@ -36,7 +36,7 @@ func (r *InternalRouter) ObserverLoop() {
 	}
 }
 
-func NewInternalRouter() (*InternalRouter) {
+func NewInternalRouter() *InternalRouter {
 	channel := make(chan *api.Event)
 
 	executor := noop.NoopExecutor{}
@@ -114,13 +114,13 @@ func (r *InternalRouter) Fail(node anemos.Node, instance *api.TaskInstance) {
 	r.Trigger(&event)
 }
 
-func (r *InternalRouter) SignalDownstream(node anemos.Node){
+func (r *InternalRouter) SignalDownstream(node anemos.Node) {
 	event := api.Event{
 		Uri: anemos.Uri{
 			Kind:      "anemos/event",
 			Provider:  "anemos",
 			Operation: "parent",
-			Name:      node.ShortName(),
+			Name:      node.Name(),
 			Id:        "0000000000000000",
 			Status:    "finished",
 		}.String(),
@@ -146,6 +146,6 @@ func (r *InternalRouter) Trigger(event *api.Event) {
 	//node.
 }
 
-func (r *InternalRouter) RegisterGroup(group anemos.Group) {
-	group.SetRouter(r)
+func (r *InternalRouter) RegisterSession(session anemos.Session) {
+	session.SetRouter(r)
 }

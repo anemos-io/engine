@@ -16,11 +16,11 @@ import (
 	"github.com/anemos-io/engine/provider/noop"
 )
 
-func NewSuccessTask(name string) (*TaskNode) {
+func NewSuccessTask(name string) *TaskNode {
 	node := NewTaskNode()
-	node.Provider = "anemos"
-	node.Operation = "noop"
-	node.Name = name
+	node.provider = "anemos"
+	node.operation = "noop"
+	node.name = name
 
 	return node
 }
@@ -43,13 +43,15 @@ func TestTwoTasks(t *testing.T) {
 	LinkDown(task1, task2)
 
 	g := NewGroup()
-	g.Name = "group"
+	g.name = "group"
 
 	g.AddNode(task1)
 	g.AddNode(task2)
 	g.Resolve()
 
-	r.RegisterGroup(g)
+	s := NewSession(g)
+	g.AssignSession(s)
+	r.RegisterSession(s)
 
 	StartGroupForSuccess(g, true, t)
 
@@ -69,14 +71,16 @@ func TestSimpleSplit(t *testing.T) {
 	LinkDown(task1, task3)
 
 	g := NewGroup()
-	g.Name = "group"
+	g.name = "group"
 
 	g.AddNode(task1)
 	g.AddNode(task2)
 	g.AddNode(task3)
 	g.Resolve()
 
-	r.RegisterGroup(g)
+	s := NewSession(g)
+	g.AssignSession(s)
+	r.RegisterSession(s)
 
 	StartGroupForSuccess(g, true, t)
 
@@ -97,14 +101,16 @@ func TestSimpleJoin(t *testing.T) {
 	LinkDown(task2, task3)
 
 	g := NewGroup()
-	g.Name = "group"
+	g.name = "group"
 
 	g.AddNode(task1)
 	g.AddNode(task2)
 	g.AddNode(task3)
 	g.Resolve()
 
-	r.RegisterGroup(g)
+	s := NewSession(g)
+	g.AssignSession(s)
+	r.RegisterSession(s)
 
 	StartGroupForSuccess(g, true, t)
 
@@ -128,7 +134,7 @@ func TestSimpleSplitAndJoin(t *testing.T) {
 	LinkDown(task3, task4)
 
 	g := NewGroup()
-	g.Name = "group"
+	g.name = "group"
 
 	g.AddNode(task1)
 	g.AddNode(task2)
@@ -136,7 +142,9 @@ func TestSimpleSplitAndJoin(t *testing.T) {
 	g.AddNode(task4)
 	g.Resolve()
 
-	r.RegisterGroup(g)
+	s := NewSession(g)
+	g.AssignSession(s)
+	r.RegisterSession(s)
 
 	StartGroupForSuccess(g, true, t)
 
@@ -152,15 +160,17 @@ func TestSingleFail(t *testing.T) {
 	r := router.NewInternalRouter()
 
 	task1 := NewSuccessTask("task1")
-	task1.Attributes[noop.AttrNameRetries] = "1"
+	task1.attributes[noop.AttrNameRetries] = "1"
 
 	g := NewGroup()
-	g.Name = "group"
+	g.name = "group"
 
 	g.AddNode(task1)
 	g.Resolve()
 
-	r.RegisterGroup(g)
+	s := NewSession(g)
+	g.AssignSession(s)
+	r.RegisterSession(s)
 
 	StartGroupForSuccess(g, false, t)
 
@@ -173,19 +183,21 @@ func TestFailPropagation(t *testing.T) {
 	r := router.NewInternalRouter()
 
 	task1 := NewSuccessTask("task1")
-	task1.Attributes[noop.AttrNameRetries] = "1"
+	task1.attributes[noop.AttrNameRetries] = "1"
 	task2 := NewSuccessTask("task2")
-	//task2.Attributes[noop.AttrNameRetries] = "1"
+	//task2.attributes[noop.AttrNameRetries] = "1"
 	LinkDown(task1, task2)
 
 	g := NewGroup()
-	g.Name = "group"
+	g.name = "group"
 
 	g.AddNode(task1)
 	g.AddNode(task2)
 	g.Resolve()
 
-	r.RegisterGroup(g)
+	s := NewSession(g)
+	g.AssignSession(s)
+	r.RegisterSession(s)
 
 	StartGroupForSuccess(g, false, t)
 
@@ -199,22 +211,24 @@ func TestFailSplitPropagation(t *testing.T) {
 	r := router.NewInternalRouter()
 
 	task1 := NewSuccessTask("task1")
-	task1.Attributes[noop.AttrNameRetries] = "1"
+	task1.attributes[noop.AttrNameRetries] = "1"
 	task2 := NewSuccessTask("task2")
 	task3 := NewSuccessTask("task3")
-	//task2.Attributes[noop.AttrNameRetries] = "1"
+	//task2.attributes[noop.AttrNameRetries] = "1"
 	LinkDown(task1, task2)
 	LinkDown(task1, task3)
 
 	g := NewGroup()
-	g.Name = "group"
+	g.name = "group"
 
 	g.AddNode(task1)
 	g.AddNode(task2)
 	g.AddNode(task3)
 	g.Resolve()
 
-	r.RegisterGroup(g)
+	s := NewSession(g)
+	g.AssignSession(s)
+	r.RegisterSession(s)
 
 	StartGroupForSuccess(g, false, t)
 
@@ -229,16 +243,16 @@ func TestFailSplitJoinPropagation(t *testing.T) {
 	r := router.NewInternalRouter()
 
 	task1 := NewSuccessTask("task1")
-	task1.Attributes[noop.AttrNameRetries] = "1"
+	task1.attributes[noop.AttrNameRetries] = "1"
 	task2 := NewSuccessTask("task2")
 	task3 := NewSuccessTask("task3")
 	task4 := NewSuccessTask("task4")
-	//task2.Attributes[noop.AttrNameRetries] = "1"
+	//task2.attributes[noop.AttrNameRetries] = "1"
 	LinkDown(task1, task2)
 	LinkDown(task1, task3)
 
 	g := NewGroup()
-	g.Name = "group"
+	g.name = "group"
 
 	g.AddNode(task1)
 	g.AddNode(task2)
@@ -246,7 +260,9 @@ func TestFailSplitJoinPropagation(t *testing.T) {
 	g.AddNode(task4)
 	g.Resolve()
 
-	r.RegisterGroup(g)
+	s := NewSession(g)
+	g.AssignSession(s)
+	r.RegisterSession(s)
 
 	StartGroupForSuccess(g, false, t)
 

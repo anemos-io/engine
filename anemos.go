@@ -11,7 +11,7 @@ import (
 type NodeInstanceStatus int
 
 const (
-	Unknown     NodeInstanceStatus = iota
+	Unknown NodeInstanceStatus = iota
 	Retry
 	Initialized
 	Queue
@@ -22,15 +22,18 @@ const (
 )
 
 type Node interface {
-	ShortName() (string)
+	Provider() string
+	Operation() string
+	Name() string
+	Attributes() map[string]string
 	//Name() (string)
-	AddUpstream(name string, node Node) ()
-	AddDownstream(name string, node Node) ()
-	Upstream() (map[string]Node)
-	Downstream() (map[string]Node)
-	Status() (NodeInstanceStatus)
-	EndStateReached() (bool)
-	SetRouter(router Router) ()
+	AddUpstream(name string, node Node)
+	AddDownstream(name string, node Node)
+	Upstream() map[string]Node
+	Downstream() map[string]Node
+	Status() NodeInstanceStatus
+	EndStateReached() bool
+	AssignSession(session Session)
 
 	OnEvent(event *api.Event)
 	OnStart(event *api.Event)
@@ -42,8 +45,14 @@ type Node interface {
 
 type Group interface {
 	Node
-	AddNode(node Node) ()
+	AddNode(node Node)
 	Resolve()
+}
+
+type Session interface {
+	SetRouter(Router)
+	Router() Router
+	NewTaskInstance(node Node) *api.TaskInstance
 }
 
 type ResourceRouter interface {
@@ -59,7 +68,7 @@ type EventRouter interface {
 type Router interface {
 	ResourceRouter
 	EventRouter
-	RegisterGroup(group Group)
+	RegisterSession(session Session)
 }
 
 type Uri struct {

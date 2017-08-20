@@ -31,7 +31,7 @@ func (g *GraphStore) LoadAll() {
 	for _, dir := range dirs {
 		fn := fmt.Sprintf("%s/%s/%s", home, base, dir.Name())
 		group := graph.ParseDagFile(fn)
-		g.graphs[group.ShortName()] = group
+		g.graphs[group.Name()] = group
 	}
 
 }

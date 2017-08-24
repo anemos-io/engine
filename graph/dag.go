@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/anemos-io/engine"
 	"log"
+	"strings"
 )
 
 type TaskConfig struct {
@@ -43,10 +44,14 @@ type binding struct {
 
 func parseTask(builder *builder, config map[interface{}]interface{}, parent anemos.Node) anemos.Node {
 	name := config["name"].(string)
+	operation := config["operation"].(string)
+	o := strings.Split(operation, ":")
 
 	task := NewTaskNode()
 	builder.nodes[name] = task
 	task.name = name
+	task.provider = o[0]
+	task.operation = o[1]
 
 	download, found := config["downstream"]
 	if found {

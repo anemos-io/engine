@@ -55,6 +55,17 @@ type Session interface {
 	NewTaskInstance(node Node) *api.TaskInstance
 }
 
+type Executor interface {
+	Execute(*api.TaskInstance)
+}
+
+type Observer interface {
+}
+
+type Trigger interface {
+	Trigger(event *api.Event)
+}
+
 type Router interface {
 	StartTask(node Node, instance *api.TaskInstance)
 	StartVirtual(node Node, instance *api.TaskInstance)

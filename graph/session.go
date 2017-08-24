@@ -9,7 +9,7 @@ import (
 
 type Session struct {
 	router anemos.Router
-	graph  *Group
+	Graph  *Group
 
 	id int
 
@@ -50,8 +50,8 @@ func NewSession(source *Group) *Session {
 	session := &Session{
 		id:        1,
 		Instances: make(map[anemos.Node][]*api.TaskInstance, 0),
-		graph:     CopyGroup(source),
+		Graph:     CopyGroup(source),
 	}
-	session.graph.AssignSession(session)
+	session.Graph.AssignSession(session)
 	return session
 }

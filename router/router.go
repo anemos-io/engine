@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/anemos-io/engine"
 	"github.com/anemos-io/engine/provider/noop"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"log"
 	"sync"
@@ -18,18 +19,34 @@ type observerServer struct {
 	router *Router
 }
 
-func (s *observerServer) CommandStream(request *api.ObserverCommandStreamRequest, stream api.Observer_CommandStreamServer) error {
-	return nil
-}
-
 type executorServer struct {
 	instances chan api.TaskInstance
-
-	router *Router
+	router    *Router
 }
 
-func (s *executorServer) CommandStream(request *api.ExecutorCommandStreamRequest, stream api.Executor_CommandStreamServer) error {
-	for {
+type remoteObserverBinding struct {
+	stream api.Observer_CommandStreamServer
+}
+
+type remoteExecutorBinding struct {
+	stream api.Executor_CommandStreamServer
+}
+
+func (reb *remoteExecutorBinding) Execute(instance *api.TaskInstance) {
+	command := api.ExecutorCommand{
+		Instance: instance,
+	}
+	reb.stream.Send(&command)
+}
+
+func (s *observerServer) CommandStream(request *api.ObserverCommandStreamRequest, stream api.Observer_CommandStreamServer) error {
+	executor := &remoteObserverBinding{
+		stream: stream,
+	}
+	s.router.observers["anemos:noop/external"] = executor
+
+	loop := true
+	for loop {
 		timeout := make(chan bool, 5)
 		go func() {
 			time.Sleep(1 * time.Second)
@@ -37,14 +54,60 @@ func (s *executorServer) CommandStream(request *api.ExecutorCommandStreamRequest
 		}()
 
 		select {
-		case cmd := <-s.instances:
-			command := api.ExecutorCommand{
-				Instance: &cmd,
-			}
-			stream.Send(&command)
+		//case cmd := <-s.instances:
+		//	command := api.ExecutorCommand{
+		//		Instance: &cmd,
+		//	}
+		//	stream.Send(&command)
 		case <-timeout:
 			log.Print("Timeout, nothing todo")
 			// the read from ch has timed out
+		}
+		err := stream.Context().Err()
+		if err != nil {
+			log.Println(err.Error())
+			loop = false
+		}
+	}
+
+	return nil
+}
+
+func (s *observerServer) Trigger(ctx context.Context, in *api.TriggerRequest) (*api.TriggerResponse, error) {
+
+	s.router.Trigger(in.Event)
+
+	return nil, nil
+}
+
+func (s *executorServer) CommandStream(request *api.ExecutorCommandStreamRequest, stream api.Executor_CommandStreamServer) error {
+	executor := &remoteExecutorBinding{
+		stream: stream,
+	}
+	s.router.executors["anemos:noop/external"] = executor
+
+	loop := true
+	for loop {
+		timeout := make(chan bool, 5)
+		go func() {
+			time.Sleep(1 * time.Second)
+			timeout <- true
+		}()
+
+		select {
+		//case cmd := <-s.instances:
+		//	command := api.ExecutorCommand{
+		//		Instance: &cmd,
+		//	}
+		//	stream.Send(&command)
+		case <-timeout:
+			log.Print("Timeout, nothing todo")
+			// the read from ch has timed out
+		}
+		err := stream.Context().Err()
+		if err != nil {
+			log.Println(err.Error())
+			loop = false
 		}
 	}
 
@@ -52,40 +115,36 @@ func (s *executorServer) CommandStream(request *api.ExecutorCommandStreamRequest
 }
 
 type Router struct {
-	Channel  chan *api.Event
-	executor noop.NoopExecutor
-	observer noop.NoopObserver
-
+	Channel   chan *api.Event
 	instances map[string]anemos.Node
 	mutex     sync.Mutex
 
+	executors map[string]anemos.Executor
+	observers map[string]anemos.Observer
+
 	executorServer *executorServer
 	observerServer *observerServer
-}
-
-func (r *Router) ObserverLoop() {
-	for true {
-		event := <-r.observer.EventChannel
-		r.Trigger(event)
-	}
 }
 
 func NewRouter(server *grpc.Server) *Router {
 	channel := make(chan *api.Event)
 
 	executor := noop.NoopExecutor{}
-	observer := noop.NoopObserver{
-		EventChannel: channel,
-	}
+	observer := noop.NoopObserver{}
 	executor.CoupleObserver(&observer)
 
 	router := &Router{
-		Channel:  channel,
-		executor: executor,
-		observer: observer,
+		Channel: channel,
 
 		instances: make(map[string]anemos.Node),
+
+		executors: make(map[string]anemos.Executor),
+		observers: make(map[string]anemos.Observer),
 	}
+	observer.Router = router
+
+	router.executors["anemos:noop"] = &executor
+	router.observers["anemos:noop"] = &observer
 
 	if server != nil {
 		observerApi := &observerServer{}
@@ -101,7 +160,6 @@ func NewRouter(server *grpc.Server) *Router {
 		api.RegisterExecutorServer(server, executorApi)
 	}
 
-	go router.ObserverLoop()
 	return router
 }
 
@@ -112,7 +170,12 @@ func (r *Router) StartTask(node anemos.Node, instance *api.TaskInstance) {
 	r.instances[iid] = node
 	r.mutex.Unlock()
 
-	r.executor.Execute(instance)
+	e, found := r.executors["anemos:noop/external"]
+	if found {
+		e.Execute(instance)
+	} else {
+		r.executors["anemos:noop"].Execute(instance)
+	}
 
 	//event := api.Event{
 	//	Uri: "anemos/event:manual",

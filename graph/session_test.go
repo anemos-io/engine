@@ -32,7 +32,7 @@ func TestCopySessionShouldNotAffectOriginal(t *testing.T) {
 	assert.Equal(t, anemos.Unknown, task2.Status())
 	assert.Equal(t, anemos.Unknown, g.Status())
 
-	assert.Equal(t, anemos.Success, s.graph.nodes["task1"].Status())
-	assert.Equal(t, anemos.Success, s.graph.nodes["task2"].Status())
-	assert.Equal(t, anemos.Success, s.graph.Status())
+	assert.Equal(t, anemos.Success, s.Graph.nodes["task1"].Status())
+	assert.Equal(t, anemos.Success, s.Graph.nodes["task2"].Status())
+	assert.Equal(t, anemos.Success, s.Graph.Status())
 }

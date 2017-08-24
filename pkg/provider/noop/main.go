@@ -9,10 +9,11 @@ import (
 	//"github.com/golang/protobuf/proto"
 	//wkt_timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	//wkt_empty "github.com/golang/protobuf/ptypes/empty"
-	api "github.com/anemos-io/engine/grpc/anemos/v1alpha1"
-	"log"
-	"io"
 	"fmt"
+	api "github.com/anemos-io/engine/grpc/anemos/v1alpha1"
+	"github.com/anemos-io/engine/provider/noop"
+	"io"
+	"log"
 )
 
 const (
@@ -22,9 +23,17 @@ const (
 type Server struct {
 }
 
-//func (s *Server) PostEvents(ctx context.Context, in *pb.PostEventsRequest) (*wkt_empty.Empty, error) {
-//
-//}
+type observerBinding struct {
+	observerClient api.ObserverClient
+}
+
+func (ob *observerBinding) Trigger(e *api.Event) {
+	request := &api.TriggerRequest{
+		Event: e,
+	}
+
+	ob.observerClient.Trigger(context.Background(), request)
+}
 
 func main() {
 
@@ -33,12 +42,20 @@ func main() {
 		log.Fatalf("error: %v", err)
 	}
 	defer conn.Close()
-	executor := api.NewExecutorClient(conn)
 
-	request := api.ExecutorCommandStreamRequest{
-	}
+	executor := noop.NoopExecutor{}
+	observer := noop.NoopObserver{}
 
-	stream, err := executor.CommandStream(context.Background(),&request)
+	binding := &observerBinding{}
+	binding.observerClient = api.NewObserverClient(conn)
+	observer.Router = binding
+
+	executor.CoupleObserver(&observer)
+	executorClient := api.NewExecutorClient(conn)
+
+	request := api.ExecutorCommandStreamRequest{}
+
+	stream, err := executorClient.CommandStream(context.Background(), &request)
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
@@ -47,6 +64,7 @@ func main() {
 		command, err := stream.Recv()
 		fmt.Println("Received")
 		fmt.Println(request)
+		executor.Execute(command.Instance)
 		if err == io.EOF {
 			break
 		}
@@ -55,6 +73,5 @@ func main() {
 		}
 		log.Println(command)
 	}
-
 
 }

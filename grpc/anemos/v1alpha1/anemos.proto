@@ -11,14 +11,10 @@ option go_package = "grpc_anemos_v1alpha1";
 //import "google/protobuf/timestamp.proto";
 
 
-service Scheduler {
-    rpc Trigger (TriggerRequest) returns (TriggerResponse) {
-    }
-
-}
-
 service Observer {
     rpc CommandStream (ObserverCommandStreamRequest) returns (stream ObserverCommand) {
+    }
+    rpc Trigger (TriggerRequest) returns (TriggerResponse) {
     }
 }
 
@@ -43,6 +39,7 @@ message Event {
 }
 
 message TriggerRequest {
+    Event event = 1;
 }
 
 message TriggerResponse {

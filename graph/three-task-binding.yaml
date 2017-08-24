@@ -4,8 +4,11 @@ metaData:
   name: three-task-binding
 tasks:
 - name: task-start
+  operation: anemos:noop
 - name: task-left
+  operation: anemos:noop
 - name: task-right
+  operation: anemos:noop
 bindings:
 - taskRef: task-start
   downstream:

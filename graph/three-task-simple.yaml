@@ -4,11 +4,11 @@ metaData:
   name: three-task-simple
 tasks:
 - name: task-start
-#  task: anemos:noop
+  operation: anemos:noop
   downstream:
   - task:
       name: task-left
-#    task: anemos:noop
+      operation: anemos:noop
   - task:
       name: task-right
-#    task: anemos:noop
+      operation: anemos:noop

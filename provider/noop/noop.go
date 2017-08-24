@@ -4,15 +4,15 @@ import (
 	"container/list"
 	"time"
 	//"fmt"
-	api "github.com/anemos-io/engine/grpc/anemos/v1alpha1"
 	"github.com/anemos-io/engine"
+	api "github.com/anemos-io/engine/grpc/anemos/v1alpha1"
 	"strconv"
 )
 
 type NoopObserver struct {
-	EventChannel chan *api.Event
-	ticks        list.List
-	looping      bool
+	Router  anemos.Trigger
+	ticks   list.List
+	looping bool
 }
 
 type NoopTaskType int
@@ -68,7 +68,6 @@ func (c *NoopObserver) Stop() {
 }
 
 func (c *NoopObserver) trigger(definition *NoopTaskDefinition, success bool) {
-
 	status := "success"
 	if !success {
 		status = "fail"
@@ -86,7 +85,7 @@ func (c *NoopObserver) trigger(definition *NoopTaskDefinition, success bool) {
 		Metadata: make(map[string]string),
 	}
 	event.Metadata[anemos.MetaEventTimestamp] = time.Now().Format(time.RFC3339Nano)
-	c.EventChannel <- &event
+	c.Router.Trigger(&event)
 }
 
 func (ne *NoopExecutor) CoupleObserver(observer *NoopObserver) {

@@ -16,10 +16,18 @@ func Equavalent_Dags(name string, t *testing.T) {
 
 	taskStart := group.begin.downstream[fmt.Sprintf("$%s+begin>task-start", name)]
 	assert.Equal(t, "task-start", taskStart.Name())
+	assert.Equal(t, "anemos", taskStart.Provider())
+	assert.Equal(t, "noop", taskStart.Operation())
 	assert.Contains(t, taskStart.Downstream(), "task-start>task-left")
-	assert.Equal(t, "task-left", taskStart.Downstream()["task-start>task-left"].Name())
+	taskLeft := taskStart.Downstream()["task-start>task-left"]
+	assert.Equal(t, "task-left", taskLeft.Name())
+	assert.Equal(t, "anemos", taskLeft.Provider())
+	assert.Equal(t, "noop", taskLeft.Operation())
 	assert.Contains(t, taskStart.Downstream(), "task-start>task-right")
-	assert.Equal(t, "task-right", taskStart.Downstream()["task-start>task-right"].Name())
+	taskRight := taskStart.Downstream()["task-start>task-right"]
+	assert.Equal(t, "task-right", taskRight.Name())
+	assert.Equal(t, "anemos", taskRight.Provider())
+	assert.Equal(t, "noop", taskRight.Operation())
 }
 
 func TestParseDag_ThreeTaskSimple(t *testing.T) {

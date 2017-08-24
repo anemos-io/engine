@@ -4,8 +4,11 @@ metaData:
   name: three-task-flat
 tasks:
 - name: task-start
+  operation: anemos:noop
   downstream:
   - taskRef: task-left
   - taskRef: task-right
 - name: task-left
+  operation: anemos:noop
 - name: task-right
+  operation: anemos:noop

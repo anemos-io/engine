@@ -1,28 +1,41 @@
 package noop
 
 import (
-	"testing"
-	"github.com/stretchr/testify/assert"
-	api "github.com/anemos-io/engine/grpc/anemos/v1alpha1"
 	"github.com/anemos-io/engine"
+	api "github.com/anemos-io/engine/grpc/anemos/v1alpha1"
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
-func execute(instance *api.TaskInstance) (*api.Event) {
+type observerBinding struct {
+	events chan *api.Event
+}
 
-	channel := make(chan *api.Event)
+func NewObserverBinding(observer *NoopObserver) (ob *observerBinding) {
+	binding := &observerBinding{
+		events: make(chan *api.Event),
+	}
+	observer.Router = binding
+	return binding
+}
+
+func (ob *observerBinding) Trigger(e *api.Event) {
+	ob.events <- e
+}
+
+func execute(instance *api.TaskInstance) *api.Event {
 
 	executor := NoopExecutor{}
-	observer := NoopObserver{
-		EventChannel: channel,
-	}
+	observer := NoopObserver{}
+	binding := NewObserverBinding(&observer)
 
 	executor.CoupleObserver(&observer)
 	executor.Execute(instance)
 
-	return <-channel
+	return <-binding.events
 }
 
-func newInstance() (*api.TaskInstance) {
+func newInstance() *api.TaskInstance {
 	return &api.TaskInstance{
 		Name:       "test",
 		Id:         "0042",
